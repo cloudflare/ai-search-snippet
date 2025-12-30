@@ -2,7 +2,7 @@ name: Upload to R2
 
 on:
   release:
-    types: [published]
+    types: [released]
 
 jobs:
   upload:
