@@ -73,7 +73,7 @@ export class NLWebClient extends Client {
           title: item.name,
           description: item.description || '',
           url: item.url,
-          metadata: item.schema_object,
+          metadata: item.schema_object as unknown as Record<string, unknown>,
         }));
       }
       if (result.error) {
