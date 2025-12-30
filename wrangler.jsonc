@@ -4,6 +4,7 @@
   "compatibility_date": "2025-11-19",
   "main": "./worker.js",
   "assets": {
+    "directory": "./dist-app",
     "not_found_handling": "single-page-application",
   }
 }

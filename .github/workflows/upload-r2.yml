@@ -1,0 +1,65 @@
+name: Upload to R2
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  upload:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.release.tag_name }}
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build:lib
+
+      - name: Install AWS CLI
+        run: |
+          set -euo pipefail
+          python3 -m pip install --upgrade pip
+          pip3 install awscli
+
+      - name: Upload dist/ to R2
+        env:
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          R2_BUCKET: ${{ vars.R2_BUCKET }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "${R2_BUCKET:-}" ]; then
+            echo "Missing vars.R2_BUCKET (Actions variable). Set it to your R2 bucket name." >&2
+            exit 1
+          fi
+
+          export AWS_ACCESS_KEY_ID="$R2_ACCESS_KEY_ID"
+          export AWS_SECRET_ACCESS_KEY="$R2_SECRET_ACCESS_KEY"
+          export AWS_DEFAULT_REGION="auto"
+
+          ENDPOINT="https://${CLOUDFLARE_ACCOUNT_ID}.r2.cloudflarestorage.com"
+
+          PREFIX="${RELEASE_TAG}/"
+
+          aws s3 sync dist "s3://${R2_BUCKET}/${PREFIX}" \
+            --endpoint-url "${ENDPOINT}" \
+            --delete \
+            --cache-control "public, max-age=31536000, immutable"
+
+          echo "Uploaded to: s3://${R2_BUCKET}/${PREFIX}"

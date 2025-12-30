@@ -1,6 +1,6 @@
 {
   "name": "nlweb-cl-snippet",
-  "version": "1.0.0",
+  "version": "0.0.2",
   "description": "A production-ready, self-contained TypeScript Web Component library for search and chat interfaces with streaming support",
   "type": "module",
   "main": "./dist/search-snippet.umd.js",
@@ -42,7 +42,9 @@
   "homepage": "https://github.com/yourusername/nlweb-cl-snippet#readme",
   "scripts": {
     "dev": "vite ",
-    "build": "tsc && vite build -c vite.build.config.ts",
+    "build": "npm run build:app && npm run build:lib",
+    "build:app": "vite build -c vite.config.ts",
+    "build:lib": "tsc && vite build -c vite.build.config.ts",
     "preview": "vite preview",
     "format": "biome format --write .",
     "format:check": "biome format .",
@@ -50,7 +52,7 @@
     "lint:fix": "biome lint --write .",
     "check": "biome check --write .",
     "check:ci": "biome ci .",
-    "prepublishOnly": "npm run build"
+    "prepublishOnly": "npm run build:lib"
   },
   "devDependencies": {
     "@biomejs/biome": "2.3.3",
