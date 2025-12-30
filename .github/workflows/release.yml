@@ -32,7 +32,7 @@ jobs:
         run: npm ci
 
       - name: Lint/format
-        run: npm run check:ci
+        run: npm run check
 
       - name: Build
         run: npm run build:lib

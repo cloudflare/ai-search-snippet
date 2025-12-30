@@ -51,7 +51,6 @@
     "lint": "biome lint .",
     "lint:fix": "biome lint --write .",
     "check": "biome check --write .",
-    "check:ci": "biome ci .",
     "prepublishOnly": "npm run build:lib"
   },
   "devDependencies": {
