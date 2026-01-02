@@ -1116,7 +1116,8 @@
                     </div>
                     <p>Inline search widget with real-time results. Perfect for embedding search functionality anywhere
                         on your page.</p>
-                    <search-bar-snippet api-url="https://docs-website-nlweb.developer-docs-autorag.workers.dev/"
+                    <search-bar-snippet
+                        api-url="https://ai-search-public-worker-staging.auto-rag.workers.dev/b33f5a77-ce16-4d2a-9397-c56270ac0a62"
                         placeholder="Search for information..." max-results="5" debounce-ms="300">
                     </search-bar-snippet>
                 </div>
@@ -1129,7 +1130,8 @@
                     <p>Floating chat widget that expands from a bubble button. Perfect for adding support chat without
                         taking up page space.</p>
                     <div class="chat-bubble-demo-container">
-                        <chat-bubble-snippet api-url="https://docs-website-nlweb.developer-docs-autorag.workers.dev/"
+                        <chat-bubble-snippet
+                            api-url="https://ai-search-public-worker-staging.auto-rag.workers.dev/b33f5a77-ce16-4d2a-9397-c56270ac0a62"
                             placeholder="Ask me anything..." class="chat-bubble-inline">
                         </chat-bubble-snippet>
                     </div>
@@ -1141,7 +1143,8 @@
                     </div>
                     <p>Full-featured chat interface with streaming responses. Ideal for dedicated chat pages or support
                         sections.</p>
-                    <chat-page-snippet api-url="https://docs-website-nlweb.developer-docs-autorag.workers.dev/"
+                    <chat-page-snippet
+                        api-url="https://ai-search-public-worker-staging.auto-rag.workers.dev/b33f5a77-ce16-4d2a-9397-c56270ac0a62"
                         placeholder="Ask me anything...">
                     </chat-page-snippet>
                 </div>
@@ -1391,7 +1394,7 @@
     <!-- Configurator Script -->
     <script>
         const PROP_CONFIGS = [
-            { name: 'api-url', type: 'text', defaultValue: 'https://docs-website-nlweb.developer-docs-autorag.workers.dev/', description: 'API endpoint URL', appliesTo: ['search-bar', 'chat-bubble', 'chat-page'] },
+            { name: 'api-url', type: 'text', defaultValue: 'https://ai-search-public-worker-staging.auto-rag.workers.dev/b33f5a77-ce16-4d2a-9397-c56270ac0a62', description: 'API endpoint URL', appliesTo: ['search-bar', 'chat-bubble', 'chat-page'] },
             { name: 'placeholder', type: 'text', defaultValue: 'Type a message...', description: 'Input placeholder text', appliesTo: ['search-bar', 'chat-bubble', 'chat-page'] },
             { name: 'max-results', type: 'number', defaultValue: 10, description: 'Maximum number of results', appliesTo: ['search-bar'] },
             { name: 'debounce-ms', type: 'number', defaultValue: 300, description: 'Debounce delay in milliseconds', appliesTo: ['search-bar'] },
