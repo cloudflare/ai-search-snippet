@@ -31,6 +31,13 @@ export class ChatPageSnippet extends HTMLElement {
   private currentSessionId: string | null = null;
   private sidebarCollapsed = false;
 
+  // Event handler references for cleanup
+  private handleClearClick: (() => void) | null = null;
+  private handleNewChatClick: (() => void) | null = null;
+  private handleToggleSidebarClick: (() => void) | null = null;
+  private handleChatListClick: ((e: Event) => void) | null = null;
+  private handleMessageEvent: (() => void) | null = null;
+
   static get observedAttributes(): string[] {
     return ['api-url', 'placeholder', 'theme'];
   }
@@ -427,16 +434,50 @@ export class ChatPageSnippet extends HTMLElement {
 
   private attachEventListeners(): void {
     const clearButton = this.shadow.querySelector('.clear-button');
-    clearButton?.addEventListener('click', () => this.clearCurrentChat());
-
     const newChatButton = this.shadow.querySelector('.new-chat-button');
-    newChatButton?.addEventListener('click', () => this.createNewChat());
-
     const toggleSidebarButton = this.shadow.querySelector('.toggle-sidebar-button');
-    toggleSidebarButton?.addEventListener('click', () => this.toggleSidebar());
-
     const chatList = this.shadow.querySelector('.chat-list');
-    chatList?.addEventListener('click', (e) => this.handleChatListClick(e));
+
+    this.handleClearClick = () => this.clearCurrentChat();
+    this.handleNewChatClick = () => this.createNewChat();
+    this.handleToggleSidebarClick = () => this.toggleSidebar();
+    this.handleChatListClick = (e: Event) => this.onChatListClick(e);
+
+    clearButton?.addEventListener('click', this.handleClearClick);
+    newChatButton?.addEventListener('click', this.handleNewChatClick);
+    toggleSidebarButton?.addEventListener('click', this.handleToggleSidebarClick);
+    chatList?.addEventListener('click', this.handleChatListClick);
+  }
+
+  private removeEventListeners(): void {
+    const clearButton = this.shadow.querySelector('.clear-button');
+    const newChatButton = this.shadow.querySelector('.new-chat-button');
+    const toggleSidebarButton = this.shadow.querySelector('.toggle-sidebar-button');
+    const chatList = this.shadow.querySelector('.chat-list');
+    const chatContent = this.shadow.querySelector('.container') as HTMLElement;
+
+    if (this.handleClearClick) {
+      clearButton?.removeEventListener('click', this.handleClearClick);
+    }
+    if (this.handleNewChatClick) {
+      newChatButton?.removeEventListener('click', this.handleNewChatClick);
+    }
+    if (this.handleToggleSidebarClick) {
+      toggleSidebarButton?.removeEventListener('click', this.handleToggleSidebarClick);
+    }
+    if (this.handleChatListClick) {
+      chatList?.removeEventListener('click', this.handleChatListClick);
+    }
+    if (this.handleMessageEvent && chatContent) {
+      chatContent.removeEventListener('message', this.handleMessageEvent);
+    }
+
+    // Clear handler references
+    this.handleClearClick = null;
+    this.handleNewChatClick = null;
+    this.handleToggleSidebarClick = null;
+    this.handleChatListClick = null;
+    this.handleMessageEvent = null;
   }
 
   private setupView(): void {
@@ -458,11 +499,12 @@ export class ChatPageSnippet extends HTMLElement {
     }
 
     // Listen for new messages to save session
-    chatContent.addEventListener('message', () => {
+    this.handleMessageEvent = () => {
       this.saveCurrentSession();
       this.updateSessionTitle();
       this.renderChatList();
-    });
+    };
+    chatContent.addEventListener('message', this.handleMessageEvent);
 
     this.renderChatList();
   }
@@ -593,7 +635,7 @@ export class ChatPageSnippet extends HTMLElement {
     sidebar?.classList.toggle('collapsed', this.sidebarCollapsed);
   }
 
-  private handleChatListClick(e: Event): void {
+  private onChatListClick(e: Event): void {
     const target = e.target as HTMLElement;
 
     // Handle delete button click
@@ -686,6 +728,8 @@ export class ChatPageSnippet extends HTMLElement {
   }
 
   private cleanup(): void {
+    this.removeEventListeners();
+
     if (this.client) {
       this.client.cancelAllRequests();
     }

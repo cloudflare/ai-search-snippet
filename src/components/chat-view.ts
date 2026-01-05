@@ -25,6 +25,11 @@ export class ChatView {
   private isStreaming = false;
   private currentStreamingMessageId: string | null = null;
 
+  // Event handler references for cleanup
+  private handleInputResize: ((e: Event) => void) | null = null;
+  private handleInputKeydown: ((e: KeyboardEvent) => void) | null = null;
+  private handleSendClick: (() => void) | null = null;
+
   constructor(container: HTMLElement, client: Client, props: SearchSnippetProps) {
     this.container = container;
     this.client = client;
@@ -79,24 +84,27 @@ export class ChatView {
     if (!this.inputElement || !this.sendButton) return;
 
     // Auto-resize textarea
-    this.inputElement.addEventListener('input', (e) => {
+    this.handleInputResize = (e: Event) => {
       const target = e.target as HTMLTextAreaElement;
       target.style.height = 'auto';
       target.style.height = `${target.scrollHeight}px`;
-    });
+    };
+    this.inputElement.addEventListener('input', this.handleInputResize);
 
     // Enter to send (Shift+Enter for new line)
-    this.inputElement.addEventListener('keydown', (e) => {
+    this.handleInputKeydown = (e: KeyboardEvent) => {
       if (e.key === 'Enter' && !e.shiftKey) {
         e.preventDefault();
         this.handleSendMessage();
       }
-    });
+    };
+    this.inputElement.addEventListener('keydown', this.handleInputKeydown);
 
     // Send button click
-    this.sendButton.addEventListener('click', () => {
+    this.handleSendClick = () => {
       this.handleSendMessage();
-    });
+    };
+    this.sendButton.addEventListener('click', this.handleSendClick);
   }
 
   /**
@@ -339,11 +347,21 @@ export class ChatView {
 
     // Remove event listeners
     if (this.inputElement) {
-      this.inputElement.replaceWith(this.inputElement.cloneNode(true));
+      if (this.handleInputResize) {
+        this.inputElement.removeEventListener('input', this.handleInputResize);
+      }
+      if (this.handleInputKeydown) {
+        this.inputElement.removeEventListener('keydown', this.handleInputKeydown);
+      }
     }
 
-    if (this.sendButton) {
-      this.sendButton.replaceWith(this.sendButton.cloneNode(true));
+    if (this.sendButton && this.handleSendClick) {
+      this.sendButton.removeEventListener('click', this.handleSendClick);
     }
+
+    // Clear handler references
+    this.handleInputResize = null;
+    this.handleInputKeydown = null;
+    this.handleSendClick = null;
   }
 }

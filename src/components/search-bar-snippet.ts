@@ -29,13 +29,14 @@ export class SearchBarSnippet extends HTMLElement {
   private currentQuery = '';
   private debouncedSearch: ((query: string) => void) | null = null;
 
+  // Event handler references for cleanup
+  private handleInputChange: ((e: Event) => void) | null = null;
+  private handleInputKeydownEnter: ((e: KeyboardEvent) => void) | null = null;
+  private handleInputKeydownEscape: ((e: KeyboardEvent) => void) | null = null;
+  private handleSearchButtonClick: (() => void) | null = null;
+
   static get observedAttributes(): string[] {
-    return [
-      'api-url',
-      'placeholder',
-      'max-results',
-      'theme',
-    ];
+    return ['api-url', 'placeholder', 'max-results', 'theme'];
   }
 
   constructor() {
@@ -145,7 +146,7 @@ export class SearchBarSnippet extends HTMLElement {
     if (!this.inputElement) return;
 
     // Input event for real-time search
-    this.inputElement.addEventListener('input', (e) => {
+    this.handleInputChange = (e: Event) => {
       const target = e.target as HTMLInputElement;
       const query = target.value.trim();
 
@@ -154,32 +155,36 @@ export class SearchBarSnippet extends HTMLElement {
       } else {
         this.showEmptyState();
       }
-    });
+    };
+    this.inputElement.addEventListener('input', this.handleInputChange);
 
     // Enter key to search immediately
-    this.inputElement.addEventListener('keydown', (e) => {
+    this.handleInputKeydownEnter = (e: KeyboardEvent) => {
       if (e.key === 'Enter') {
         const query = (e.target as HTMLInputElement).value.trim();
         if (query.length > 0) {
           this.performSearch(query);
         }
       }
-    });
+    };
+    this.inputElement.addEventListener('keydown', this.handleInputKeydownEnter);
 
-    this.inputElement.addEventListener('keydown', (e) => {
+    this.handleInputKeydownEscape = (e: KeyboardEvent) => {
       if (e.key === 'Escape' && this.inputElement) {
         this.inputElement.value = '';
       }
-    });
+    };
+    this.inputElement.addEventListener('keydown', this.handleInputKeydownEscape);
 
     // Search button click
     if (this.searchButton) {
-      this.searchButton.addEventListener('click', () => {
+      this.handleSearchButtonClick = () => {
         const query = this.inputElement?.value.trim() || '';
         if (query.length > 0) {
           this.performSearch(query);
         }
-      });
+      };
+      this.searchButton.addEventListener('click', this.handleSearchButtonClick);
     }
   }
 
@@ -328,10 +333,28 @@ export class SearchBarSnippet extends HTMLElement {
       this.client.cancelAllRequests();
     }
 
-    // Remove event listeners by cloning
+    // Remove event listeners
     if (this.inputElement) {
-      this.inputElement.replaceWith(this.inputElement.cloneNode(true));
+      if (this.handleInputChange) {
+        this.inputElement.removeEventListener('input', this.handleInputChange);
+      }
+      if (this.handleInputKeydownEnter) {
+        this.inputElement.removeEventListener('keydown', this.handleInputKeydownEnter);
+      }
+      if (this.handleInputKeydownEscape) {
+        this.inputElement.removeEventListener('keydown', this.handleInputKeydownEscape);
+      }
     }
+
+    if (this.searchButton && this.handleSearchButtonClick) {
+      this.searchButton.removeEventListener('click', this.handleSearchButtonClick);
+    }
+
+    // Clear handler references
+    this.handleInputChange = null;
+    this.handleInputKeydownEnter = null;
+    this.handleInputKeydownEscape = null;
+    this.handleSearchButtonClick = null;
   }
 
   // Public API

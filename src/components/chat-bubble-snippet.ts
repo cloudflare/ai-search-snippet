@@ -22,6 +22,12 @@ export class ChatBubbleSnippet extends HTMLElement {
   private isExpanded = false;
   private isMinimized = false;
 
+  // Event handler references for cleanup
+  private handleBubbleClick: (() => void) | null = null;
+  private handleCloseClick: (() => void) | null = null;
+  private handleMinimizeClick: (() => void) | null = null;
+  private handleClearClick: (() => void) | null = null;
+
   static get observedAttributes(): string[] {
     return ['api-url', 'placeholder', 'theme'];
   }
@@ -278,10 +284,41 @@ export class ChatBubbleSnippet extends HTMLElement {
     const minimizeButton = this.shadow.querySelector('.minimize-button');
     const clearButton = this.shadow.querySelector('.clear-button');
 
-    bubbleButton?.addEventListener('click', () => this.toggleChat());
-    closeButton?.addEventListener('click', () => this.closeChat());
-    minimizeButton?.addEventListener('click', () => this.toggleMinimize());
-    clearButton?.addEventListener('click', () => this.clearChat());
+    this.handleBubbleClick = () => this.toggleChat();
+    this.handleCloseClick = () => this.closeChat();
+    this.handleMinimizeClick = () => this.toggleMinimize();
+    this.handleClearClick = () => this.clearChat();
+
+    bubbleButton?.addEventListener('click', this.handleBubbleClick);
+    closeButton?.addEventListener('click', this.handleCloseClick);
+    minimizeButton?.addEventListener('click', this.handleMinimizeClick);
+    clearButton?.addEventListener('click', this.handleClearClick);
+  }
+
+  private removeEventListeners(): void {
+    const bubbleButton = this.shadow.querySelector('.bubble-button');
+    const closeButton = this.shadow.querySelector('.close-button');
+    const minimizeButton = this.shadow.querySelector('.minimize-button');
+    const clearButton = this.shadow.querySelector('.clear-button');
+
+    if (this.handleBubbleClick) {
+      bubbleButton?.removeEventListener('click', this.handleBubbleClick);
+    }
+    if (this.handleCloseClick) {
+      closeButton?.removeEventListener('click', this.handleCloseClick);
+    }
+    if (this.handleMinimizeClick) {
+      minimizeButton?.removeEventListener('click', this.handleMinimizeClick);
+    }
+    if (this.handleClearClick) {
+      clearButton?.removeEventListener('click', this.handleClearClick);
+    }
+
+    // Clear handler references
+    this.handleBubbleClick = null;
+    this.handleCloseClick = null;
+    this.handleMinimizeClick = null;
+    this.handleClearClick = null;
   }
 
   private toggleChat(): void {
@@ -345,6 +382,8 @@ export class ChatBubbleSnippet extends HTMLElement {
   }
 
   private cleanup(): void {
+    this.removeEventListeners();
+
     if (this.client) {
       this.client.cancelAllRequests();
     }
