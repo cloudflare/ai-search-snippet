@@ -29,7 +29,7 @@ export class ChatBubbleSnippet extends HTMLElement {
   private handleClearClick: (() => void) | null = null;
 
   static get observedAttributes(): string[] {
-    return ['api-url', 'placeholder', 'theme'];
+    return ['api-url', 'placeholder', 'theme', 'hide-branding'];
   }
 
   constructor() {
@@ -63,6 +63,7 @@ export class ChatBubbleSnippet extends HTMLElement {
       apiUrl: parseAttribute(this.getAttribute('api-url'), 'http://localhost:3000'),
       placeholder: parseAttribute(this.getAttribute('placeholder'), 'Type a message...'),
       theme: parseAttribute(this.getAttribute('theme'), 'auto') as 'light' | 'dark' | 'auto',
+      hideBranding: this.hasAttribute('hide-branding'),
     };
   }
 
@@ -239,6 +240,13 @@ export class ChatBubbleSnippet extends HTMLElement {
   }
 
   private getBaseHTML(): string {
+    const props = this.getProps();
+    const brandingHTML = props.hideBranding
+      ? ''
+      : `<div class="powered-by">
+          Powered by <a href="https://ai.cloudflare.com" target="_blank" rel="noopener noreferrer">Cloudflare AI Search</a>
+        </div>`;
+
     return `
       <button class="bubble-button" aria-label="Open chat">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -274,6 +282,7 @@ export class ChatBubbleSnippet extends HTMLElement {
           </div>
         </div>
         <div class="chat-content"></div>
+        ${brandingHTML}
       </div>
     `;
   }

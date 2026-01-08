@@ -18,6 +18,8 @@ export interface SearchSnippetProps {
   debounceMs?: number;
   /** Color scheme */
   theme?: Theme;
+  /** Hide the "Powered by Cloudflare AI Search" branding */
+  hideBranding?: boolean;
 }
 
 /**

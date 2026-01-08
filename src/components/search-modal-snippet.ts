@@ -47,7 +47,15 @@ export class SearchModalSnippet extends HTMLElement {
   private handleBackdropClick: ((e: MouseEvent) => void) | null = null;
 
   static get observedAttributes(): string[] {
-    return ['api-url', 'placeholder', 'max-results', 'theme', 'shortcut', 'debounce-ms'];
+    return [
+      'api-url',
+      'placeholder',
+      'max-results',
+      'theme',
+      'shortcut',
+      'debounce-ms',
+      'hide-branding',
+    ];
   }
 
   constructor() {
@@ -85,6 +93,7 @@ export class SearchModalSnippet extends HTMLElement {
       theme: parseAttribute(this.getAttribute('theme'), 'auto') as 'light' | 'dark' | 'auto',
       shortcut: parseAttribute(this.getAttribute('shortcut'), 'k'),
       useMetaKey: this.getAttribute('use-meta-key') !== 'false',
+      hideBranding: this.hasAttribute('hide-branding'),
     };
   }
 
@@ -115,6 +124,12 @@ export class SearchModalSnippet extends HTMLElement {
 
     const style = document.createElement('style');
     style.textContent = `${baseStyles}\n${modalStyles}`;
+
+    const brandingHTML = props.hideBranding
+      ? ''
+      : `<div class="powered-by-inline">
+          Powered by <a href="https://ai.cloudflare.com" target="_blank" rel="noopener noreferrer">Cloudflare AI Search</a>
+        </div>`;
 
     const container = document.createElement('div');
     container.innerHTML = `
@@ -160,7 +175,7 @@ export class SearchModalSnippet extends HTMLElement {
               <span>Close</span>
             </div>
           </div>
-          <div class="modal-results-count"></div>
+          ${brandingHTML}
         </div>
       </div>
     `;

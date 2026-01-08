@@ -2142,7 +2142,8 @@ export default defineConfig({
             { name: 'debounce-ms', type: 'number', defaultValue: 300, description: 'Debounce delay in milliseconds', appliesTo: ['search-bar', 'search-modal'] },
             { name: 'theme', type: 'select', options: ['light', 'dark', 'auto'], defaultValue: 'auto', description: 'Color theme', appliesTo: ['search-bar', 'search-modal', 'chat-bubble', 'chat-page'] },
             { name: 'shortcut', type: 'text', defaultValue: 'k', description: 'Keyboard shortcut key', appliesTo: ['search-modal'] },
-            { name: 'use-meta-key', type: 'select', options: ['true', 'false'], defaultValue: 'true', description: 'Use Cmd/Ctrl modifier', appliesTo: ['search-modal'] }
+            { name: 'use-meta-key', type: 'select', options: ['true', 'false'], defaultValue: 'true', description: 'Use Cmd/Ctrl modifier', appliesTo: ['search-modal'] },
+            { name: 'hide-branding', type: 'boolean', defaultValue: false, description: 'Hide "Powered by Cloudflare AI Search" branding', appliesTo: ['search-bar', 'search-modal', 'chat-bubble', 'chat-page'] }
         ];
 
         const CSS_VAR_CONFIGS = [

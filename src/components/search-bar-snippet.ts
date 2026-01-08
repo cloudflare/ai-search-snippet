@@ -36,7 +36,7 @@ export class SearchBarSnippet extends HTMLElement {
   private handleSearchButtonClick: (() => void) | null = null;
 
   static get observedAttributes(): string[] {
-    return ['api-url', 'placeholder', 'max-results', 'theme'];
+    return ['api-url', 'placeholder', 'max-results', 'theme', 'hide-branding'];
   }
 
   constructor() {
@@ -73,6 +73,7 @@ export class SearchBarSnippet extends HTMLElement {
       maxResults: parseNumberAttribute(this.getAttribute('max-results'), 10),
       debounceMs: parseNumberAttribute(this.getAttribute('debounce-ms'), 300),
       theme: parseAttribute(this.getAttribute('theme'), 'auto') as 'light' | 'dark' | 'auto',
+      hideBranding: this.hasAttribute('hide-branding'),
     };
   }
 
@@ -213,6 +214,13 @@ export class SearchBarSnippet extends HTMLElement {
       return;
     }
 
+    const props = this.getProps();
+    const brandingHTML = props.hideBranding
+      ? ''
+      : `<div class="powered-by">
+            Powered by <a href="https://ai.cloudflare.com" target="_blank" rel="noopener noreferrer">Cloudflare AI Search</a>
+         </div>`;
+
     const resultsHTML = `
             <div class="search-header">
                 <div class="search-count">
@@ -222,6 +230,7 @@ export class SearchBarSnippet extends HTMLElement {
             <div class="search-results">
                 ${results.map((result) => this.renderResult(result)).join('')}
             </div>
+            ${brandingHTML}
         `;
 
     this.resultsContainer.innerHTML = resultsHTML;

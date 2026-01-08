@@ -368,4 +368,45 @@ export const baseStyles = `
   outline: 2px solid var(--search-snippet-primary-color);
   outline-offset: 2px;
 }
+
+/* Powered by branding - block style (for sidebars) */
+.powered-by {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--search-snippet-spacing-xs);
+  padding: var(--search-snippet-spacing-sm) var(--search-snippet-spacing-md);
+  font-size: var(--search-snippet-font-size-sm);
+  color: var(--search-snippet-text-secondary);
+  background: var(--search-snippet-surface);
+  border-top: var(--search-snippet-border-width) solid var(--search-snippet-border-color);
+  margin-top: auto;
+  flex-shrink: 0;
+}
+
+.powered-by svg {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+}
+
+.powered-by a,
+.powered-by-inline a {
+  color: var(--search-snippet-text-secondary);
+  text-decoration: none;
+  transition: color var(--search-snippet-transition-fast);
+}
+
+.powered-by a:hover,
+.powered-by-inline a:hover {
+  color: var(--search-snippet-primary-color);
+}
+
+/* Powered by branding - inline style (for headers/subtle placement) */
+.powered-by-inline {
+  font-size: var(--search-snippet-font-size-sm);
+  color: var(--search-snippet-text-secondary);
+  padding: var(--search-snippet-spacing-xs) 0;
+  text-align: center;
+}
 `;

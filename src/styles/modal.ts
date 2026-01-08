@@ -286,6 +286,22 @@ export const modalStyles = `
   color: var(--search-snippet-text-secondary);
 }
 
+/* Powered by in modal footer */
+.modal-footer .powered-by-inline {
+  font-size: var(--search-snippet-font-size-sm);
+  color: var(--search-snippet-text-secondary);
+}
+
+.modal-footer .powered-by-inline a {
+  color: var(--search-snippet-text-secondary);
+  text-decoration: none;
+  transition: color var(--search-snippet-transition-fast);
+}
+
+.modal-footer .powered-by-inline a:hover {
+  color: var(--search-snippet-primary-color);
+}
+
 /* Responsive adjustments */
 @media (max-width: 640px) {
   .modal-container {

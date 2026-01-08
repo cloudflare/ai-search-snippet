@@ -39,7 +39,7 @@ export class ChatPageSnippet extends HTMLElement {
   private handleMessageEvent: (() => void) | null = null;
 
   static get observedAttributes(): string[] {
-    return ['api-url', 'placeholder', 'theme'];
+    return ['api-url', 'placeholder', 'theme', 'hide-branding'];
   }
 
   constructor() {
@@ -77,6 +77,7 @@ export class ChatPageSnippet extends HTMLElement {
       apiUrl: parseAttribute(this.getAttribute('api-url'), 'http://localhost:3000'),
       placeholder: parseAttribute(this.getAttribute('placeholder'), 'Type a message...'),
       theme: parseAttribute(this.getAttribute('theme'), 'auto') as 'light' | 'dark' | 'auto',
+      hideBranding: this.hasAttribute('hide-branding'),
     };
   }
 
@@ -388,6 +389,13 @@ export class ChatPageSnippet extends HTMLElement {
   }
 
   private getBaseHTML(): string {
+    const props = this.getProps();
+    const brandingHTML = props.hideBranding
+      ? ''
+      : `<div class="powered-by">
+          Powered by <a href="https://ai.cloudflare.com" target="_blank" rel="noopener noreferrer">Cloudflare AI Search</a>
+        </div>`;
+
     return `
       <div class="chat-sidebar">
         <div class="sidebar-header">
@@ -400,6 +408,7 @@ export class ChatPageSnippet extends HTMLElement {
           New Chat
         </button>
         <div class="chat-list"></div>
+        ${brandingHTML}
       </div>
       <div class="chat-main">
         <div class="chat-page-header">
