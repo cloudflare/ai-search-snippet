@@ -16,6 +16,8 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-markup.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-css.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-javascript.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-jsx.min.js"></script>
     <style>
         :root {
             /* Cloudflare AI Search Color Palette - Light Theme */
@@ -1296,6 +1298,58 @@
             right: -7px;
             bottom: -7px;
         }
+
+        /* Quick Start Tabs */
+        .quickstart-tabs {
+            display: flex;
+            border-bottom: 1px solid var(--color-border-100);
+            background: var(--color-background-200);
+            padding: 8px 8px 0;
+            gap: 4px;
+        }
+
+        .quickstart-tab {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 20px;
+            background: transparent;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            color: var(--color-foreground-200);
+            border-radius: 8px 8px 0 0;
+            transition: all 0.2s ease;
+            border-width: 1px 1px 0 1px;
+            border-style: solid;
+            border-color: transparent;
+            margin-bottom: -1px;
+        }
+
+        .quickstart-tab:hover {
+            color: var(--color-foreground-100);
+            background: var(--color-background-100);
+        }
+
+        .quickstart-tab.active {
+            background: var(--color-background-100);
+            color: var(--color-foreground-100);
+            border-color: var(--color-border-100);
+            border-bottom-color: var(--color-background-100);
+        }
+
+        .quickstart-tab svg {
+            width: 18px;
+            height: 18px;
+        }
+
+        .quickstart-panel {
+            display: none;
+        }
+
+        .quickstart-panel.active {
+            display: block;
+        }
     </style>
 </head>
 
@@ -1706,12 +1760,35 @@
             </div>
 
             <div class="code-block">
-                <div class="code-header">
-                    <span class="code-title">index.html</span>
-                    <button class="code-copy" onclick="copyQuickStart()">Copy</button>
+                <div class="quickstart-tabs">
+                    <button class="quickstart-tab active" data-tab="html">
+                        <svg viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M1.5 0h21l-1.91 21.563L11.977 24l-8.564-2.438L1.5 0zm7.031 9.75l-.232-2.718 10.059.003.23-2.622L5.412 4.41l.698 8.01h9.126l-.326 3.426-2.91.804-2.955-.81-.188-2.11H6.248l.33 4.171L12 19.351l5.379-1.443.744-8.157H8.531z"/>
+                        </svg>
+                        HTML
+                    </button>
+                    <button class="quickstart-tab" data-tab="react">
+                        <svg viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M14.23 12.004a2.236 2.236 0 0 1-2.235 2.236 2.236 2.236 0 0 1-2.236-2.236 2.236 2.236 0 0 1 2.235-2.236 2.236 2.236 0 0 1 2.236 2.236zm2.648-10.69c-1.346 0-3.107.96-4.888 2.622-1.78-1.653-3.542-2.602-4.887-2.602-.41 0-.783.093-1.106.278-1.375.793-1.683 3.264-.973 6.365C1.98 8.917 0 10.42 0 12.004c0 1.59 1.99 3.097 5.043 4.03-.704 3.113-.39 5.588.988 6.38.32.187.69.275 1.102.275 1.345 0 3.107-.96 4.888-2.624 1.78 1.654 3.542 2.603 4.887 2.603.41 0 .783-.09 1.106-.275 1.374-.792 1.683-3.263.973-6.365C22.02 15.096 24 13.59 24 12.004c0-1.59-1.99-3.097-5.043-4.032.704-3.11.39-5.587-.988-6.38-.318-.184-.688-.277-1.092-.278zm-.005 1.09v.006c.225 0 .406.044.558.127.666.382.955 1.835.73 3.704-.054.46-.142.945-.25 1.44-.96-.236-2.006-.417-3.107-.534-.66-.905-1.345-1.727-2.035-2.447 1.592-1.48 3.087-2.292 4.105-2.295zm-9.77.02c1.012 0 2.514.808 4.11 2.28-.686.72-1.37 1.537-2.02 2.442-1.107.117-2.154.298-3.113.538-.112-.49-.195-.964-.254-1.42-.23-1.868.054-3.32.714-3.707.19-.09.4-.127.563-.132zm4.882 3.05c.455.468.91.992 1.36 1.564-.44-.02-.89-.034-1.345-.034-.46 0-.915.01-1.36.034.44-.572.895-1.096 1.345-1.565zM12 8.1c.74 0 1.477.034 2.202.093.406.582.802 1.203 1.183 1.86.372.64.71 1.29 1.018 1.946-.308.655-.646 1.31-1.013 1.95-.38.66-.773 1.288-1.18 1.87-.728.063-1.466.098-2.21.098-.74 0-1.477-.035-2.202-.093-.406-.582-.802-1.204-1.183-1.86-.372-.64-.71-1.29-1.018-1.946.303-.657.646-1.313 1.013-1.954.38-.66.773-1.286 1.18-1.868.728-.064 1.466-.098 2.21-.098zm-3.635.254c-.24.377-.48.763-.704 1.16-.225.39-.435.782-.635 1.174-.265-.656-.49-1.31-.676-1.947.64-.15 1.315-.283 2.015-.386zm7.26 0c.695.103 1.365.23 2.006.387-.18.632-.405 1.282-.66 1.933-.2-.39-.41-.783-.64-1.174-.225-.392-.465-.774-.705-1.146zm3.063.675c.484.15.944.317 1.375.498 1.732.74 2.852 1.708 2.852 2.476-.005.768-1.125 1.74-2.857 2.475-.42.18-.88.342-1.355.493-.28-.958-.646-1.956-1.1-2.98.45-1.017.81-2.01 1.085-2.964zm-13.395.004c.278.96.645 1.957 1.1 2.98-.45 1.017-.812 2.01-1.086 2.964-.484-.15-.944-.318-1.37-.5-1.732-.737-2.852-1.706-2.852-2.474 0-.768 1.12-1.742 2.852-2.476.42-.18.88-.342 1.356-.494zm11.678 4.28c.265.657.49 1.312.676 1.948-.64.157-1.316.29-2.016.39.24-.375.48-.762.705-1.158.225-.39.435-.788.636-1.18zm-9.945.02c.2.392.41.783.64 1.175.23.39.465.772.705 1.143-.695-.102-1.365-.23-2.006-.386.18-.63.406-1.282.66-1.933zM17.92 16.32c.112.493.2.968.254 1.423.23 1.868-.054 3.32-.714 3.708-.147.09-.338.128-.563.128-1.012 0-2.514-.807-4.11-2.28.686-.72 1.37-1.536 2.02-2.44 1.107-.118 2.154-.3 3.113-.54zm-11.83.01c.96.234 2.006.415 3.107.532.66.905 1.345 1.727 2.035 2.446-1.595 1.483-3.092 2.295-4.11 2.295-.22-.005-.406-.05-.553-.132-.666-.38-.955-1.834-.73-3.703.054-.46.142-.944.25-1.438zm4.56.64c.44.02.89.034 1.345.034.46 0 .915-.01 1.36-.034-.44.572-.895 1.095-1.345 1.565-.455-.47-.91-.993-1.36-1.565z"/>
+                        </svg>
+                        React
+                    </button>
+                    <button class="quickstart-tab" data-tab="vue">
+                        <svg viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M24,1.61H14.06L12,5.16,9.94,1.61H0L12,22.39ZM12,14.08,5.16,2.23H9.59L12,6.41l2.41-4.18h4.43Z"/>
+                        </svg>
+                        Vue
+                    </button>
                 </div>
-                <div class="code-content">
-                    <pre class="language-html"><code class="language-html">&lt;!-- Import the library --&gt;
+
+                <!-- HTML Panel -->
+                <div class="quickstart-panel active" data-panel="html">
+                    <div class="code-header">
+                        <span class="code-title">index.html</span>
+                        <button class="code-copy" onclick="copyQuickStartCode('html')">Copy</button>
+                    </div>
+                    <div class="code-content">
+                        <pre class="language-html"><code class="language-html">&lt;!-- Import the library --&gt;
 &lt;script type="module" src="https://cdn.example.com/search-snippet.es.js"&gt;&lt;/script&gt;
 
 &lt;!-- 1. Chat Bubble Widget (Fixed bottom-right) --&gt;
@@ -1745,6 +1822,186 @@
         --search-snippet-border-radius: 12px;
     }
 &lt;/style&gt;</code></pre>
+                    </div>
+                </div>
+
+                <!-- React Panel -->
+                <div class="quickstart-panel" data-panel="react">
+                    <div class="code-header">
+                        <span class="code-title">App.tsx</span>
+                        <button class="code-copy" onclick="copyQuickStartCode('react')">Copy</button>
+                    </div>
+                    <div class="code-content">
+                        <pre class="language-jsx"><code class="language-jsx">import { useEffect, useRef } from 'react';
+import '@anthropic/search-snippet';
+
+// Wrapper component for type-safe props
+function SearchBar({ apiUrl, placeholder, maxResults }: {
+  apiUrl: string;
+  placeholder?: string;
+  maxResults?: number;
+}) {
+  const ref = useRef&lt;HTMLElement&gt;(null);
+
+  useEffect(() =&gt; {
+    // Web Components work directly in React 19+
+    // For older versions, set attributes manually
+    if (ref.current) {
+      ref.current.setAttribute('api-url', apiUrl);
+      if (placeholder) ref.current.setAttribute('placeholder', placeholder);
+      if (maxResults) ref.current.setAttribute('max-results', String(maxResults));
+    }
+  }, [apiUrl, placeholder, maxResults]);
+
+  return &lt;search-bar-snippet ref={ref} /&gt;;
+}
+
+// Usage in your app
+export default function App() {
+  return (
+    &lt;div&gt;
+      {/* Search Bar */}
+      &lt;SearchBar 
+        apiUrl="https://api.example.com"
+        placeholder="Search..."
+        maxResults={10}
+      /&gt;
+
+      {/* Chat Bubble - works directly as Web Component */}
+      &lt;chat-bubble-snippet 
+        api-url="https://api.example.com"
+        style={{ '--search-snippet-primary-color': '#F6821F' } as React.CSSProperties}
+      /&gt;
+
+      {/* Search Modal with keyboard shortcut */}
+      &lt;search-modal-snippet 
+        api-url="https://api.example.com"
+        placeholder="Search documentation..."
+        shortcut="k"
+      /&gt;
+    &lt;/div&gt;
+  );
+}
+
+// TypeScript declarations (add to global.d.ts)
+declare namespace JSX {
+  interface IntrinsicElements {
+    'search-bar-snippet': React.DetailedHTMLProps&lt;
+      React.HTMLAttributes&lt;HTMLElement&gt; &amp; {
+        'api-url'?: string;
+        placeholder?: string;
+        'max-results'?: string;
+      },
+      HTMLElement
+    &gt;;
+    'chat-bubble-snippet': React.DetailedHTMLProps&lt;
+      React.HTMLAttributes&lt;HTMLElement&gt; &amp; {
+        'api-url'?: string;
+        placeholder?: string;
+      },
+      HTMLElement
+    &gt;;
+    'search-modal-snippet': React.DetailedHTMLProps&lt;
+      React.HTMLAttributes&lt;HTMLElement&gt; &amp; {
+        'api-url'?: string;
+        placeholder?: string;
+        shortcut?: string;
+      },
+      HTMLElement
+    &gt;;
+  }
+}</code></pre>
+                    </div>
+                </div>
+
+                <!-- Vue Panel -->
+                <div class="quickstart-panel" data-panel="vue">
+                    <div class="code-header">
+                        <span class="code-title">App.vue</span>
+                        <button class="code-copy" onclick="copyQuickStartCode('vue')">Copy</button>
+                    </div>
+                    <div class="code-content">
+                        <pre class="language-html"><code class="language-html">&lt;script setup lang="ts"&gt;
+import '@anthropic/search-snippet';
+import { ref } from 'vue';
+
+const apiUrl = 'https://api.example.com';
+const searchPlaceholder = ref('Search...');
+const maxResults = ref(10);
+
+// Handle custom events from components
+function onSearchComplete(event: CustomEvent) {
+  console.log('Search results:', event.detail);
+}
+
+function onChatMessage(event: CustomEvent) {
+  console.log('Chat message:', event.detail);
+}
+&lt;/script&gt;
+
+&lt;template&gt;
+  &lt;div&gt;
+    &lt;!-- Search Bar with v-bind --&gt;
+    &lt;search-bar-snippet
+      :api-url="apiUrl"
+      :placeholder="searchPlaceholder"
+      :max-results="maxResults"
+      @search-complete="onSearchComplete"
+    /&gt;
+
+    &lt;!-- Chat Bubble Widget --&gt;
+    &lt;chat-bubble-snippet
+      :api-url="apiUrl"
+      placeholder="Ask me anything..."
+      @chat-message="onChatMessage"
+    /&gt;
+
+    &lt;!-- Search Modal (Cmd/Ctrl+K) --&gt;
+    &lt;search-modal-snippet
+      :api-url="apiUrl"
+      placeholder="Search documentation..."
+      shortcut="k"
+    /&gt;
+
+    &lt;!-- Full Page Chat --&gt;
+    &lt;chat-page-snippet
+      :api-url="apiUrl"
+      class="chat-container"
+    /&gt;
+  &lt;/div&gt;
+&lt;/template&gt;
+
+&lt;style&gt;
+/* Customize with CSS Variables */
+search-bar-snippet,
+chat-bubble-snippet {
+  --search-snippet-primary-color: #F6821F;
+  --search-snippet-border-radius: 12px;
+}
+
+.chat-container {
+  height: 500px;
+}
+&lt;/style&gt;
+
+&lt;!-- vite.config.ts - Configure Vue to recognize custom elements --&gt;
+&lt;!--
+import { defineConfig } from 'vite';
+import vue from '@vitejs/plugin-vue';
+
+export default defineConfig({
+  plugins: [
+    vue({
+      template: {
+        compilerOptions: {
+          isCustomElement: (tag) =&gt; tag.includes('-snippet')
+        }
+      }
+    })
+  ]
+});
+--&gt;</code></pre>
+                    </div>
                 </div>
             </div>
         </section>
@@ -1840,14 +2097,32 @@
     </script>
 
 
-    <!-- Quick Start Copy Function -->
+    <!-- Quick Start Tabs & Copy Function -->
     <script>
-        async function copyQuickStart() {
-            const codeBlock = document.querySelector('#quick-start .code-content code');
-            if (codeBlock) {
+        // Quick Start Tab Switching
+        document.querySelectorAll('.quickstart-tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                const targetTab = tab.dataset.tab;
+                
+                // Update active tab
+                document.querySelectorAll('.quickstart-tab').forEach(t => t.classList.remove('active'));
+                tab.classList.add('active');
+                
+                // Update active panel
+                document.querySelectorAll('.quickstart-panel').forEach(p => p.classList.remove('active'));
+                document.querySelector(`.quickstart-panel[data-panel="${targetTab}"]`).classList.add('active');
+            });
+        });
+
+        // Copy code for specific tab
+        async function copyQuickStartCode(tab) {
+            const panel = document.querySelector(`.quickstart-panel[data-panel="${tab}"]`);
+            const codeBlock = panel?.querySelector('.code-content code');
+            const btn = panel?.querySelector('.code-copy');
+            
+            if (codeBlock && btn) {
                 try {
                     await navigator.clipboard.writeText(codeBlock.textContent);
-                    const btn = document.querySelector('#quick-start .code-copy');
                     const orig = btn.textContent;
                     btn.textContent = 'Copied!';
                     setTimeout(() => { btn.textContent = orig }, 2000);
