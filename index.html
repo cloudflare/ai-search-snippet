@@ -1183,6 +1183,49 @@
         }
 
         /* Code Tabs */
+        /* View Switcher (Preview/Code tabs) */
+        .view-switcher {
+            display: flex;
+            padding: 0.75rem 1rem;
+            gap: 0.5rem;
+            border-bottom: 1px solid var(--stone-200);
+            background: var(--stone-50);
+        }
+
+        .view-tab {
+            padding: 0.5rem 1rem;
+            font-size: 0.8125rem;
+            font-weight: 500;
+            color: var(--stone-500);
+            background: transparent;
+            border: none;
+            border-radius: var(--radius-md);
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+
+        .view-tab:hover {
+            color: var(--stone-700);
+            background: var(--stone-100);
+        }
+
+        .view-tab.active {
+            color: var(--stone-900);
+            background: white;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+        }
+
+        .view-content {
+            flex: 1;
+            display: none;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .view-content.active {
+            display: flex;
+        }
+
         .code-tabs {
             display: flex;
             gap: 0.25rem;
@@ -1247,46 +1290,18 @@
             background: transparent !important;
         }
 
-        /* Preview Section */
-        .preview-section {
-            flex: 1;
-            overflow-y: auto;
-            display: flex;
-            flex-direction: column;
-        }
-
-        .preview-section:has(.preview-chat-bubble) {
-            overflow: visible;
-        }
-
-        /* Mobile: Split code and preview 50:50 */
+        /* Mobile: Stack code block */
         @media (max-width: 767px) {
             .code-block {
                 flex: 1 1 0;
                 min-height: 120px;
             }
-
-            .preview-section {
-                flex: 1 1 0;
-                min-height: 120px;
-            }
-        }
-
-        .preview-label {
-            font-size: 0.6875rem;
-            font-weight: 600;
-            letter-spacing: 0.1em;
-            text-transform: uppercase;
-            color: var(--stone-400);
-            padding: 0.75rem 1rem;
-            border-bottom: 1px solid var(--stone-200);
-            background: var(--stone-50);
         }
 
         .preview-container {
             flex: 1;
             background: white;
-            padding: 2rem 1.5rem;
+            padding: 3rem 1.5rem 2rem;
             display: flex;
             flex-direction: column;
             align-items: center;
@@ -2263,35 +2278,14 @@
             </div>
 
             <div class="modal-main">
-                <div class="code-tabs">
-                    <button class="code-tab active" data-format="html">
-                        <img src="/html5.svg" alt="HTML5" width="18" height="18">
-                        HTML
-                    </button>
-                    <button class="code-tab" data-format="react">
-                        <img src="/react.svg" alt="React" width="18" height="18">
-                        React
-                    </button>
-                    <button class="code-tab" data-format="vue">
-                        <img src="/vue.svg" alt="Vue" width="18" height="18">
-                        Vue
-                    </button>
+                <!-- View Switcher -->
+                <div class="view-switcher">
+                    <button class="view-tab active" data-view="preview">Preview</button>
+                    <button class="view-tab" data-view="code">Code</button>
                 </div>
 
-                <div class="code-block">
-                    <pre><code class="language-html" id="code-output">&lt;!-- Add to your HTML --&gt;
-&lt;script src="https://unpkg.com/@cloudflare/ai-search-snippet"&gt;&lt;/script&gt;
-
-&lt;search-bar-snippet
-  api-url="https://your-instance.search.ai.cloudflare.com"
-  placeholder="Search documentation..."
-  theme="auto"
-  max-results="10"
-&gt;&lt;/search-bar-snippet&gt;</code></pre>
-                </div>
-
-                <div class="preview-section">
-                    <div class="preview-label">Preview</div>
+                <!-- Preview View -->
+                <div class="view-content active" id="preview-view">
                     <div class="preview-container" id="preview-container">
                         <!-- Live preview will be rendered here -->
                         <div style="display: flex; align-items: center; gap: 0.75rem; padding: 0.75rem 1rem; border: 1px solid var(--stone-200); border-radius: 8px; width: 100%; max-width: 24rem;">
@@ -2301,6 +2295,36 @@
                             </svg>
                             <span style="color: #a8a29e; font-size: 0.875rem;">Search documentation...</span>
                         </div>
+                    </div>
+                </div>
+
+                <!-- Code View -->
+                <div class="view-content" id="code-view">
+                    <div class="code-tabs">
+                        <button class="code-tab active" data-format="html">
+                            <img src="/html5.svg" alt="HTML5" width="18" height="18">
+                            HTML
+                        </button>
+                        <button class="code-tab" data-format="react">
+                            <img src="/react.svg" alt="React" width="18" height="18">
+                            React
+                        </button>
+                        <button class="code-tab" data-format="vue">
+                            <img src="/vue.svg" alt="Vue" width="18" height="18">
+                            Vue
+                        </button>
+                    </div>
+
+                    <div class="code-block">
+                        <pre><code class="language-html" id="code-output">&lt;!-- Add to your HTML --&gt;
+&lt;script src="https://unpkg.com/@cloudflare/ai-search-snippet"&gt;&lt;/script&gt;
+
+&lt;search-bar-snippet
+  api-url="https://your-instance.search.ai.cloudflare.com"
+  placeholder="Search documentation..."
+  theme="auto"
+  max-results="10"
+&gt;&lt;/search-bar-snippet&gt;</code></pre>
                     </div>
                 </div>
             </div>
@@ -2467,6 +2491,12 @@
         }
 
         document.getElementById('modal-copy').addEventListener('click', async () => {
+            // Switch to code tab
+            document.querySelectorAll('.view-tab').forEach(t => t.classList.remove('active'));
+            document.querySelector('.view-tab[data-view="code"]').classList.add('active');
+            document.getElementById('preview-view').classList.remove('active');
+            document.getElementById('code-view').classList.add('active');
+
             const endpoint = document.getElementById('config-endpoint').value.trim();
             const code = codeOutput.textContent;
             const btn = document.getElementById('modal-copy');
@@ -2583,6 +2613,19 @@
             document.getElementById('advanced-content').classList.remove('open');
 
             updateCodeOutput();
+        });
+
+        // View switcher tabs (Preview/Code)
+        document.querySelector('.view-switcher').addEventListener('click', (e) => {
+            const tab = e.target.closest('.view-tab');
+            if (!tab) return;
+
+            document.querySelectorAll('.view-tab').forEach(t => t.classList.remove('active'));
+            tab.classList.add('active');
+
+            const view = tab.dataset.view;
+            document.getElementById('preview-view').classList.toggle('active', view === 'preview');
+            document.getElementById('code-view').classList.toggle('active', view === 'code');
         });
 
         // Code format tabs
