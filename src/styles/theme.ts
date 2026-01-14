@@ -395,6 +395,9 @@ export const baseStyles = `
   color: var(--search-snippet-text-secondary);
   text-decoration: none;
   transition: color var(--search-snippet-transition-fast);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
 }
 
 .powered-by a:hover,

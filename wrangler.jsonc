@@ -7,5 +7,11 @@
     "directory": "./dist-app",
     "binding": "ASSETS",
     "not_found_handling": "single-page-application"
-  }
+  },
+  "routes": [
+    {
+      "pattern": "search.ai.cloudflare.com/*",
+      "zone_id": "search.ai.cloudflare.com"
+    }
+  ]
 }

@@ -9,4 +9,4 @@ export const CLOUDFLARE_LOGO_SVG = `<svg width="32" height="10" viewBox="0 0 412
 
 export const CLOUDFLARE_SEARCH_URL = 'https://search.ai.cloudflare.com';
 
-export const POWERED_BY_BRANDING = `Powered by <a href="${CLOUDFLARE_SEARCH_URL}" target="_blank" rel="noopener noreferrer">Cloudflare AI Search</a> ${CLOUDFLARE_LOGO_SVG}`;
+export const POWERED_BY_BRANDING = `Powered by <a href="${CLOUDFLARE_SEARCH_URL}" target="_blank" rel="noopener noreferrer">Cloudflare AI Search ${CLOUDFLARE_LOGO_SVG}</a>`;
