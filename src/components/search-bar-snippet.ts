@@ -16,6 +16,7 @@ import {
   parseBooleanAttribute,
   parseNumberAttribute,
 } from '../utils/index.ts';
+import { POWERED_BY_BRANDING } from '../constants.ts';
 
 const COMPONENT_NAME = 'search-bar-snippet';
 
@@ -217,9 +218,7 @@ export class SearchBarSnippet extends HTMLElement {
     const props = this.getProps();
     const brandingHTML = props.hideBranding
       ? ''
-      : `<div class="powered-by-inline">
-            Powered by <a href="https://search.ai.cloudflare.com" target="_blank" rel="noopener noreferrer">Cloudflare AI Search</a>
-         </div>`;
+      : `<div class="powered-by-inline">${POWERED_BY_BRANDING}</div>`;
 
     const resultsHTML = `
             <div class="search-header">

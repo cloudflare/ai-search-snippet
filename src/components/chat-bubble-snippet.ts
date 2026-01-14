@@ -14,6 +14,7 @@ import {
   parseAttribute,
   parseBooleanAttribute,
 } from '../utils/index.ts';
+import { POWERED_BY_BRANDING } from '../constants.ts';
 import type { Message } from './chat-view.ts';
 import { ChatView } from './chat-view.ts';
 
@@ -248,9 +249,7 @@ export class ChatBubbleSnippet extends HTMLElement {
     const props = this.getProps();
     const brandingHTML = props.hideBranding
       ? ''
-      : `<div class="powered-by">
-          Powered by <a href="https://search.ai.cloudflare.com" target="_blank" rel="noopener noreferrer">Cloudflare AI Search</a>
-        </div>`;
+      : `<div class="powered-by">${POWERED_BY_BRANDING}</div>`;
 
     return `
       <button class="bubble-button" aria-label="Open chat">

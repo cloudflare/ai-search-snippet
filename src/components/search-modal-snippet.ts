@@ -17,6 +17,7 @@ import {
   parseBooleanAttribute,
   parseNumberAttribute,
 } from '../utils/index.ts';
+import { POWERED_BY_BRANDING } from '../constants.ts';
 
 const COMPONENT_NAME = 'search-modal-snippet';
 
@@ -46,6 +47,15 @@ export class SearchModalSnippet extends HTMLElement {
   private handleInputChange: ((e: Event) => void) | null = null;
   private handleInputKeydown: ((e: KeyboardEvent) => void) | null = null;
   private handleBackdropClick: ((e: MouseEvent) => void) | null = null;
+
+  // Scroll lock state
+  private savedBodyStyles: {
+    overflow: string;
+    position: string;
+    top: string;
+    width: string;
+  } | null = null;
+  private savedHtmlOverflow: string | null = null;
 
   static get observedAttributes(): string[] {
     return [
@@ -129,9 +139,7 @@ export class SearchModalSnippet extends HTMLElement {
 
     const brandingHTML = props.hideBranding
       ? ''
-      : `<div class="powered-by-inline">
-          Powered by <a href="https://search.ai.cloudflare.com" target="_blank" rel="noopener noreferrer">Cloudflare AI Search</a>
-        </div>`;
+      : `<div class="powered-by-inline">${POWERED_BY_BRANDING}</div>`;
 
     const container = document.createElement('div');
     container.innerHTML = `
@@ -550,6 +558,45 @@ export class SearchModalSnippet extends HTMLElement {
     }
   }
 
+  private lockBodyScroll(): void {
+    // Save current body styles
+    const scrollY = window.scrollY;
+    this.savedBodyStyles = {
+      overflow: document.body.style.overflow,
+      position: document.body.style.position,
+      top: document.body.style.top,
+      width: document.body.style.width,
+    };
+    this.savedHtmlOverflow = document.documentElement.style.overflow;
+
+    // Apply scroll lock styles to both html and body for cross-browser support
+    document.documentElement.style.overflow = 'hidden';
+    document.body.style.overflow = 'hidden';
+    document.body.style.position = 'fixed';
+    document.body.style.top = `-${scrollY}px`;
+    document.body.style.width = '100%';
+  }
+
+  private unlockBodyScroll(): void {
+    if (!this.savedBodyStyles) return;
+
+    // Get the scroll position from the top style
+    const scrollY = Math.abs(Number.parseInt(document.body.style.top || '0', 10));
+
+    // Restore original styles
+    document.documentElement.style.overflow = this.savedHtmlOverflow || '';
+    document.body.style.overflow = this.savedBodyStyles.overflow;
+    document.body.style.position = this.savedBodyStyles.position;
+    document.body.style.top = this.savedBodyStyles.top;
+    document.body.style.width = this.savedBodyStyles.width;
+
+    // Restore scroll position
+    window.scrollTo(0, scrollY);
+
+    this.savedBodyStyles = null;
+    this.savedHtmlOverflow = null;
+  }
+
   private cleanup(): void {
     // Remove global keyboard listener
     if (this.handleGlobalKeydown) {
@@ -602,8 +649,8 @@ export class SearchModalSnippet extends HTMLElement {
       });
     });
 
-    // Prevent body scroll
-    document.body.style.overflow = 'hidden';
+    // Prevent body scroll (save current styles to restore later)
+    this.lockBodyScroll();
 
     this.dispatchEvent(createCustomEvent('open', undefined));
   }
@@ -627,7 +674,7 @@ export class SearchModalSnippet extends HTMLElement {
     this.showEmptyState();
 
     // Restore body scroll
-    document.body.style.overflow = '';
+    this.unlockBodyScroll();
 
     this.dispatchEvent(createCustomEvent('close', undefined));
   }
