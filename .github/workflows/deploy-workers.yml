@@ -36,7 +36,7 @@ jobs:
         run: npm ci
 
       - name: Build
-        run: npm run build:app
+        run: npm run build
 
       - name: Ensure assets output exists
         run: |

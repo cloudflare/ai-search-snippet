@@ -25,10 +25,7 @@
     "chat",
     "streaming",
     "typescript",
-    "nlweb",
     "ui-component",
-    "custom-elements",
-    "shadow-dom",
     "framework-agnostic"
   ],
   "author": "Your Name",
