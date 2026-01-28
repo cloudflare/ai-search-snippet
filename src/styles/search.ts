@@ -242,7 +242,7 @@ a.search-result-item:focus-visible {
 
 .search-result-snippet {
   font-size: var(--search-snippet-font-size-sm);
-  color: var(--search-snippet-text-secondary);
+  color: var(--search-snippet-text-description);
   line-height: 1.6;
   display: -webkit-box;
   -webkit-line-clamp: 3;

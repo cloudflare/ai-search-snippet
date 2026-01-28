@@ -2659,6 +2659,11 @@ export default defineConfig({
                                 <td>Secondary/muted text</td>
                             </tr>
                             <tr>
+                                <td><code>--search-snippet-text-description</code></td>
+                                <td class="var-default">#495057</td>
+                                <td>Search result description text (higher contrast)</td>
+                            </tr>
+                            <tr>
                                 <td><code>--search-snippet-border-color</code></td>
                                 <td class="var-default">#dee2e6</td>
                                 <td>Border color</td>
@@ -3394,6 +3399,7 @@ export default defineConfig({
             // Colors - Text (theme-dependent)
             { name: '--search-snippet-text-color', type: 'color', lightDefault: '#212529', darkDefault: '#f1f1f1', description: 'Primary text color', category: 'Text Colors', themeable: true },
             { name: '--search-snippet-text-secondary', type: 'color', lightDefault: '#6c757d', darkDefault: '#a0a0a0', description: 'Secondary/muted text', category: 'Text Colors', themeable: true },
+            { name: '--search-snippet-text-description', type: 'color', lightDefault: '#495057', darkDefault: '#adb5bd', description: 'Search result description text', category: 'Text Colors', themeable: true },
 
             // Colors - Border (theme-dependent)
             { name: '--search-snippet-border-color', type: 'color', lightDefault: '#dee2e6', darkDefault: '#404040', description: 'Border color', category: 'Border Colors', themeable: true },

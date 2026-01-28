@@ -248,7 +248,7 @@ a.modal-result-item:focus-visible {
 
 .modal-result-description {
   font-size: var(--search-snippet-font-size-sm);
-  color: var(--search-snippet-text-secondary);
+  color: var(--search-snippet-text-description);
   line-height: 1.5;
   display: -webkit-box;
   -webkit-line-clamp: 2;

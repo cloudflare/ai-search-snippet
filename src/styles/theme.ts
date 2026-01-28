@@ -11,6 +11,7 @@ export const baseStyles = `
   --search-snippet-surface: #f8f9fa;
   --search-snippet-text-color: #212529;
   --search-snippet-text-secondary: #6c757d;
+  --search-snippet-text-description: #495057;
   --search-snippet-border-color: #dee2e6;
   --search-snippet-hover-background: #f1f3f5;
   --search-snippet-focus-ring: #0066cc40;
@@ -122,6 +123,7 @@ export const baseStyles = `
   --search-snippet-surface: #f8f9fa;
   --search-snippet-text-color: #212529;
   --search-snippet-text-secondary: #6c757d;
+  --search-snippet-text-description: #495057;
   --search-snippet-border-color: #dee2e6;
   --search-snippet-hover-background: #f1f3f5;
   --search-snippet-focus-ring: #0066cc40;
@@ -150,6 +152,7 @@ export const baseStyles = `
     --search-snippet-surface: #25262b;
     --search-snippet-text-color: #c1c2c5;
     --search-snippet-text-secondary: #909296;
+    --search-snippet-text-description: #adb5bd;
     --search-snippet-border-color: #373a40;
     --search-snippet-hover-background: #2c2e33;
     --search-snippet-focus-ring: #4dabf740;
