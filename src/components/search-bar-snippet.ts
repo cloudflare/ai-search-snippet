@@ -4,6 +4,7 @@
  */
 
 import type { Client } from '../api/index.ts';
+import { POWERED_BY_BRANDING } from '../constants.ts';
 import { searchStyles } from '../styles/search.ts';
 import { baseStyles } from '../styles/theme.ts';
 import type { SearchResult, SearchSnippetProps } from '../types/index.ts';
@@ -16,7 +17,6 @@ import {
   parseBooleanAttribute,
   parseNumberAttribute,
 } from '../utils/index.ts';
-import { POWERED_BY_BRANDING } from '../constants.ts';
 
 const COMPONENT_NAME = 'search-bar-snippet';
 
@@ -247,16 +247,17 @@ export class SearchBarSnippet extends HTMLElement {
 
   private renderResult(result: SearchResult): string {
     const imageHTML = this.renderResultImage(result.image, result.title);
+    const href = result.url ? escapeHTML(result.url) : '#';
 
     return `
-            <div class="search-result-item" role="button" tabindex="0" data-result-id="${escapeHTML(result.url || '')}">
+            <a href="${href}" class="search-result-item" data-result-id="${escapeHTML(result.url || '')}">
                 ${imageHTML}
                 <div class="search-result-content">
                     <div class="search-result-title">${escapeHTML(result.title || '')}</div>
                     <div class="search-result-snippet">${escapeHTML(result.description || '')}</div>
-                    ${result.url ? `<a href="${escapeHTML(result.url)}" class="search-result-url">${escapeHTML(result.url)}</a>` : ''}
+                    ${result.url ? `<span class="search-result-url">${escapeHTML(result.url)}</span>` : ''}
                 </div>
-            </div>
+            </a>
         `;
   }
 
@@ -289,18 +290,14 @@ export class SearchBarSnippet extends HTMLElement {
     const resultItems = this.container?.querySelectorAll('.search-result-item');
     if (!resultItems) return;
 
+    // Handle clicks on results without URLs (prevent default anchor behavior)
     for (const item of resultItems) {
-      item.addEventListener('click', () => {
-        const resultId = item.getAttribute('data-result-id');
-        console.log('Result clicked:', resultId);
-      });
-
-      // Keyboard accessibility
-      item.addEventListener('keydown', (e) => {
-        if ((e as KeyboardEvent).key === 'Enter' || (e as KeyboardEvent).key === ' ') {
-          (item as HTMLElement).click();
-        }
-      });
+      const href = item.getAttribute('href');
+      if (href === '#') {
+        item.addEventListener('click', (e) => {
+          e.preventDefault();
+        });
+      }
     }
 
     // Image load/error handlers

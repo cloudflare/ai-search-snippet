@@ -137,7 +137,7 @@ export const searchStyles = `
   gap: var(--search-snippet-spacing-sm);
 }
 
-.search-result-item {
+a.search-result-item {
   display: flex;
   flex-direction: row;
   align-items: flex-start;
@@ -148,6 +148,8 @@ export const searchStyles = `
   border-radius: var(--search-snippet-border-radius);
   cursor: pointer;
   transition: var(--search-snippet-transition);
+  text-decoration: none;
+  color: inherit;
 }
 
 /* Image thumbnail container */
@@ -215,14 +217,14 @@ export const searchStyles = `
   min-width: 0;
 }
 
-.search-result-item:hover {
+a.search-result-item:hover {
   background: var(--search-snippet-hover-background);
   border-color: var(--search-snippet-primary-color);
   transform: translateY(-1px);
   box-shadow: var(--search-snippet-result-item-shadow);
 }
 
-.search-result-item:focus-visible {
+a.search-result-item:focus-visible {
   outline: 2px solid var(--search-snippet-primary-color);
   outline-offset: 2px;
 }

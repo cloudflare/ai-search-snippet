@@ -137,7 +137,7 @@ export const modalStyles = `
   gap: var(--search-snippet-spacing-xs);
 }
 
-.modal-result-item {
+a.modal-result-item {
   padding: var(--search-snippet-spacing-md);
   background: transparent;
   border: var(--search-snippet-border-width) solid transparent;
@@ -148,6 +148,8 @@ export const modalStyles = `
   flex-direction: row;
   align-items: flex-start;
   gap: var(--search-snippet-spacing-md);
+  text-decoration: none;
+  color: inherit;
 }
 
 /* Image thumbnail container */
@@ -218,18 +220,18 @@ export const modalStyles = `
   gap: var(--search-snippet-spacing-xs);
 }
 
-.modal-result-item:hover,
-.modal-result-item.active {
+a.modal-result-item:hover,
+a.modal-result-item.active {
   background: var(--search-snippet-hover-background);
   border-color: var(--search-snippet-border-color);
 }
 
-.modal-result-item.active {
+a.modal-result-item.active {
   border-color: var(--search-snippet-primary-color);
   background: var(--search-snippet-focus-ring);
 }
 
-.modal-result-item:focus-visible {
+a.modal-result-item:focus-visible {
   outline: 2px solid var(--search-snippet-primary-color);
   outline-offset: -2px;
 }

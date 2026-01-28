@@ -5,6 +5,7 @@
  */
 
 import type { Client } from '../api/index.ts';
+import { POWERED_BY_BRANDING } from '../constants.ts';
 import { modalStyles } from '../styles/modal.ts';
 import { baseStyles } from '../styles/theme.ts';
 import type { SearchResult, SearchSnippetProps } from '../types/index.ts';
@@ -17,7 +18,6 @@ import {
   parseBooleanAttribute,
   parseNumberAttribute,
 } from '../utils/index.ts';
-import { POWERED_BY_BRANDING } from '../constants.ts';
 
 const COMPONENT_NAME = 'search-modal-snippet';
 
@@ -326,9 +326,13 @@ export class SearchModalSnippet extends HTMLElement {
       })
     );
 
-    // Navigate to URL if present
-    if (result.url) {
-      window.location.href = result.url;
+    // Navigate to URL - click the active link element to trigger navigation
+    const activeItem = this.resultsContainer?.querySelector(
+      `.modal-result-item[data-index="${this.activeIndex}"]`
+    ) as HTMLAnchorElement | null;
+
+    if (activeItem && result.url) {
+      activeItem.click();
     }
 
     this.close();
@@ -384,9 +388,11 @@ export class SearchModalSnippet extends HTMLElement {
 
   private renderResult(result: SearchResult, index: number): string {
     const imageHTML = this.renderResultImage(result.image, result.title);
+    const href = result.url ? escapeHTML(result.url) : '#';
 
     return `
-      <div 
+      <a 
+        href="${href}"
         class="modal-result-item${index === this.activeIndex ? ' active' : ''}" 
         role="option" 
         id="result-${index}"
@@ -399,9 +405,9 @@ export class SearchModalSnippet extends HTMLElement {
         <div class="modal-result-content">
           <div class="modal-result-title">${escapeHTML(result.title || '')}</div>
           ${result.description ? `<div class="modal-result-description">${escapeHTML(result.description)}</div>` : ''}
-          ${result.url ? `<a href="${escapeHTML(result.url)}" class="modal-result-url" tabindex="-1">${escapeHTML(result.url)}</a>` : ''}
+          ${result.url ? `<span class="modal-result-url">${escapeHTML(result.url)}</span>` : ''}
         </div>
-      </div>
+      </a>
     `;
   }
 
@@ -435,14 +441,13 @@ export class SearchModalSnippet extends HTMLElement {
     if (!items) return;
 
     items.forEach((item, index) => {
-      item.addEventListener('click', (e) => {
-        // Don't navigate if clicking the URL link directly
-        if ((e.target as HTMLElement).classList.contains('modal-result-url')) {
-          return;
-        }
-        this.activeIndex = index;
-        this.selectActiveResult();
-      });
+      // Handle clicks on results without URLs (prevent default anchor behavior)
+      const href = item.getAttribute('href');
+      if (href === '#') {
+        item.addEventListener('click', (e) => {
+          e.preventDefault();
+        });
+      }
 
       item.addEventListener('mouseenter', () => {
         this.activeIndex = index;
