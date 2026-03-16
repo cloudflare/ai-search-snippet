@@ -1,0 +1,56 @@
+{
+  "name": "@cloudflare/ai-search-snippet",
+  "version": "0.0.25",
+  "description": "A production-ready, self-contained TypeScript Web Component library for search and chat interfaces with streaming support",
+  "type": "module",
+  "main": "./dist/search-snippet.umd.js",
+  "module": "./dist/search-snippet.es.js",
+  "types": "./dist/main.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/main.d.ts",
+      "import": "./dist/search-snippet.es.js",
+      "require": "./dist/search-snippet.umd.js",
+      "default": "./dist/search-snippet.es.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "keywords": [
+    "web-components",
+    "search",
+    "chat",
+    "streaming",
+    "typescript",
+    "ui-component",
+    "framework-agnostic"
+  ],
+  "author": "Cloudflare",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/cloudflare/ai-search-snippet.git",
+    "directory": "packages/snippet"
+  },
+  "bugs": {
+    "url": "https://github.com/cloudflare/ai-search-snippet/issues"
+  },
+  "homepage": "https://github.com/cloudflare/ai-search-snippet#readme",
+  "scripts": {
+    "build": "tsc --noEmit && vite build",
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "pnpm run build"
+  },
+  "private": false,
+  "devDependencies": {
+    "vite": "^7.3.0",
+    "vite-plugin-dts": "^4.5.4",
+    "vitest": "^3.2.4"
+  },
+  "engines": {
+    "node": ">=16.0.0"
+  }
+}

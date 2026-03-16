@@ -4,45 +4,70 @@ This document provides guidelines for AI coding agents working in this repositor
 
 ## Project Overview
 
-**ai-search-snippet** is a zero-dependency TypeScript Web Component library providing search and chat interfaces with streaming support. Components use Shadow DOM encapsulation and are framework-agnostic.
+**ai-search-snippet** is a pnpm monorepo containing a zero-dependency TypeScript Web Component library for search and chat interfaces with streaming support, along with a Cloudflare Workers demo site and framework integration demos.
+
+### Monorepo Structure
+
+```
+/
+├── packages/
+│   └── snippet/           # @cloudflare/ai-search-snippet (publishable library)
+│       └── src/           # Library source code
+├── apps/
+│   ├── workers/           # Cloudflare Workers demo site (search.ai.cloudflare.com)
+│   ├── demo-react/        # React integration demo
+│   └── demo-vue/          # Vue integration demo
+├── pnpm-workspace.yaml    # Workspace configuration
+├── tsconfig.base.json     # Shared TypeScript base config
+└── biome.json             # Shared linting/formatting config
+```
 
 ## Commands
 
-### Development
+### Root (all packages)
 ```bash
-npm run dev              # Start Vite dev server (http://localhost:5173)
-npm run preview          # Preview production build
+pnpm install                # Install all workspace dependencies
+pnpm run build              # Build all packages
+pnpm run lint               # Lint all packages
+pnpm run check              # Full Biome check with auto-fix (recommended)
+pnpm run typecheck          # Type check all packages
+pnpm run test               # Run all tests
 ```
 
-### Build
+### Library (packages/snippet)
 ```bash
-npm run build            # Build both demo app and library
-npm run build:lib        # Build library only (outputs to dist/)
-npm run build:app        # Build demo app for Cloudflare Workers
+pnpm --filter @cloudflare/ai-search-snippet run build       # Build library (outputs to dist/)
+pnpm --filter @cloudflare/ai-search-snippet run typecheck   # Type check library
+```
+
+### Workers App (apps/workers)
+```bash
+pnpm --filter ai-search-snippet-workers run dev      # Start Vite dev server
+pnpm --filter ai-search-snippet-workers run build    # Build for deployment
+pnpm --filter ai-search-snippet-workers run deploy   # Deploy to Cloudflare Workers
+```
+
+### Demo Apps
+```bash
+pnpm --filter demo-react run dev     # Start React demo dev server
+pnpm --filter demo-vue run dev       # Start Vue demo dev server
 ```
 
 ### Code Quality
 ```bash
-npm run lint             # Run Biome linter
-npm run lint:fix         # Auto-fix lint issues
-npm run format           # Format code with Biome
-npm run format:check     # Check formatting without changes
-npm run check            # Full Biome check with auto-fix (recommended)
-npx tsc --noEmit         # Type check without emitting files
+pnpm run lint             # Run Biome linter
+pnpm run lint:fix         # Auto-fix lint issues
+pnpm run format           # Format code with Biome
+pnpm run format:check     # Check formatting without changes
+pnpm run check            # Full Biome check with auto-fix (recommended)
+pnpm run typecheck        # Type check all packages
 ```
 
 ### Testing
 ```bash
-npx vitest               # Run all tests
-npx vitest run           # Run tests once (CI mode)
-npx vitest <pattern>     # Run tests matching pattern
-npx vitest src/utils     # Run tests in specific directory
-npx vitest -t "test name"  # Run single test by name
-```
-
-### Deployment
-```bash
-npx wrangler deploy      # Deploy to Cloudflare Workers (requires auth)
+pnpm run test                          # Run all tests across workspace
+pnpm --filter @cloudflare/ai-search-snippet exec vitest        # Run snippet tests
+pnpm --filter @cloudflare/ai-search-snippet exec vitest run    # Run tests once (CI mode)
 ```
 
 ## Code Style
@@ -179,14 +204,29 @@ private async performRequest(): Promise<void> {
 
 ## File Organization
 
+### Library (`packages/snippet/`)
 ```
-src/
-├── api/           # API clients (abstract Client, AISearchClient)
-├── components/    # Web Components (one per file)
-├── styles/        # CSS-in-JS theme and component styles
-├── types/         # TypeScript interfaces and types
-├── utils/         # Utility functions (debounce, sanitize, etc.)
-└── main.ts        # Library entry point and exports
+packages/snippet/
+├── src/
+│   ├── api/           # API clients (abstract Client, AISearchClient)
+│   ├── components/    # Web Components (one per file)
+│   ├── styles/        # CSS-in-JS theme and component styles
+│   ├── types/         # TypeScript interfaces and types
+│   ├── utils/         # Utility functions (debounce, sanitize, etc.)
+│   └── main.ts        # Library entry point and exports
+├── package.json       # @cloudflare/ai-search-snippet
+├── tsconfig.json      # Extends ../../tsconfig.base.json
+└── vite.config.ts     # Library build config
+```
+
+### Workers App (`apps/workers/`)
+```
+apps/workers/
+├── index.html         # Demo landing page
+├── worker.js          # Cloudflare Worker entrypoint
+├── wrangler.jsonc     # Cloudflare Workers config
+├── vite.config.ts     # App build config (Cloudflare plugin)
+└── public/            # Static assets
 ```
 
 ## Common Pitfalls
@@ -197,3 +237,5 @@ src/
 4. **Duplicate registration:** Guard `customElements.define()` calls
 5. **Type-only imports:** Use `import type` for interfaces/types
 6. **CSS variable prefix:** Always use `--search-snippet-` or `--chat-bubble-`
+7. **Workspace dependencies:** Use `workspace:*` for internal package references
+8. **Build order:** Library must build before apps that depend on it (`pnpm run build` handles this)

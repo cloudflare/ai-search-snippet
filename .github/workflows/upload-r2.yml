@@ -30,17 +30,20 @@ jobs:
           fi
           echo "RELEASE_TAG=$TAG" >> "$GITHUB_ENV"
 
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: "20"
-          cache: npm
+          cache: pnpm
 
       - name: Install dependencies
-        run: npm ci
+        run: pnpm install --frozen-lockfile
 
-      - name: Build
-        run: npm run build:lib
+      - name: Build library
+        run: pnpm --filter @cloudflare/ai-search-snippet run build
 
       - name: Install AWS CLI
         run: |
@@ -70,7 +73,7 @@ jobs:
 
           PREFIX="${RELEASE_TAG}/"
 
-          aws s3 sync dist "s3://${R2_BUCKET}/${PREFIX}" \
+          aws s3 sync packages/snippet/dist "s3://${R2_BUCKET}/${PREFIX}" \
             --endpoint-url "${ENDPOINT}" \
             --delete \
             --cache-control "public, max-age=31536000, immutable"

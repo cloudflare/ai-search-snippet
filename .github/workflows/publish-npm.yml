@@ -34,18 +34,21 @@ jobs:
           fi
           echo "RELEASE_TAG=$TAG" >> "$GITHUB_ENV"
 
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
       - name: Setup Node
         uses: actions/setup-node@v6
         with:
           node-version: "24.x"
-          cache: npm
+          cache: pnpm
           registry-url: "https://registry.npmjs.org"
 
       - name: Install dependencies
-        run: npm ci
+        run: pnpm install --frozen-lockfile
 
-      - name: Build
-        run: npm run build:lib
+      - name: Build library
+        run: pnpm --filter @cloudflare/ai-search-snippet run build
 
       - name: Publish
-        run: npm publish --access public
+        run: pnpm --filter @cloudflare/ai-search-snippet publish --access public --no-git-checks

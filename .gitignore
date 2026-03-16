@@ -24,3 +24,7 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Legacy lockfiles (using pnpm)
+package-lock.json
+yarn.lock

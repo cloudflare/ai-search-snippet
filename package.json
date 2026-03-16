@@ -1,67 +1,29 @@
 {
-  "name": "@cloudflare/ai-search-snippet",
-  "version": "0.0.25",
-  "description": "A production-ready, self-contained TypeScript Web Component library for search and chat interfaces with streaming support",
+  "name": "ai-search-snippet-monorepo",
+  "private": true,
   "type": "module",
-  "main": "./dist/search-snippet.umd.js",
-  "module": "./dist/search-snippet.es.js",
-  "types": "./dist/main.d.ts",
-  "exports": {
-    ".": {
-      "types": "./dist/main.d.ts",
-      "import": "./dist/search-snippet.es.js",
-      "require": "./dist/search-snippet.umd.js",
-      "default": "./dist/search-snippet.es.js"
-    }
-  },
-  "files": [
-    "dist",
-    "README.md",
-    "LICENSE"
-  ],
-  "keywords": [
-    "web-components",
-    "search",
-    "chat",
-    "streaming",
-    "typescript",
-    "ui-component",
-    "framework-agnostic"
-  ],
-  "author": "Cloudflare",
-  "license": "MIT",
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/cloudflare/ai-search-snippet.git"
-  },
-  "bugs": {
-    "url": "https://github.com/cloudflare/ai-search-snippet/issues"
-  },
-  "homepage": "https://github.com/cloudflare/ai-search-snippet#readme",
   "scripts": {
-    "dev": "vite ",
-    "build": "npm run build:app && npm run build:lib",
-    "build:app": "vite build -c vite.config.ts",
-    "build:lib": "tsc && vite build -c vite.build.config.ts",
-    "preview": "vite preview",
-    "format": "biome format --write ./src ./index.html",
-    "format:check": "biome format ./src ./index.html",
-    "lint": "biome lint ./src ./index.html",
-    "lint:fix": "biome lint --write ./src ./index.html",
-    "check": "biome check --write ./src ./index.html",
-    "prepublishOnly": "npm run build:lib"
+    "build": "pnpm -r run build",
+    "lint": "biome lint .",
+    "lint:fix": "biome lint --write .",
+    "format": "biome format --write .",
+    "format:check": "biome format .",
+    "check": "biome check --fix .",
+    "test": "pnpm -r run test",
+    "typecheck": "pnpm -r run typecheck"
   },
-  "private": false,
   "devDependencies": {
     "@biomejs/biome": "2.3.3",
-    "@cloudflare/vite-plugin": "^1.15.0",
-    "typescript": "~5.8.3",
-    "vite": "^7.3.0",
-    "vite-plugin-dts": "^4.5.4",
-    "vitest": "^3.2.4",
-    "wrangler": "^4.58.0"
+    "typescript": "~5.8.3"
   },
   "engines": {
     "node": ">=16.0.0"
+  },
+  "packageManager": "pnpm@10.12.1",
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild",
+      "workerd"
+    ]
   }
 }

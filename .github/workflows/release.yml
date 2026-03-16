@@ -22,20 +22,23 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: "20"
-          cache: npm
+          cache: pnpm
 
       - name: Install dependencies
-        run: npm ci
+        run: pnpm install --frozen-lockfile
 
       - name: Lint/format
-        run: npm run check
+        run: pnpm run check
 
-      - name: Build
-        run: npm run build:lib
+      - name: Build library
+        run: pnpm --filter @cloudflare/ai-search-snippet run build
 
       - name: Ensure tag exists (workflow_dispatch)
         if: ${{ github.event_name == 'workflow_dispatch' }}
@@ -65,6 +68,6 @@ jobs:
           tag_name: ${{ github.event_name == 'workflow_dispatch' && format('v{0}', inputs.version) || github.ref_name }}
           generate_release_notes: true
           files: |
-            dist/*
+            packages/snippet/dist/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

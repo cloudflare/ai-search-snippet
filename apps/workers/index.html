@@ -1905,8 +1905,7 @@
                             <rect x="42" y="43" width="60" height="6" rx="2" style="fill: var(--stone-300)" />
                             <rect x="126" y="38" width="36" height="18" rx="4" fill="#F6821F" />
                             <!-- Divider line -->
-                            <line x1="20" y1="62" x2="160" y2="62" stroke-width="1"
-                                style="stroke: var(--stone-200)" />
+                            <line x1="20" y1="62" x2="160" y2="62" stroke-width="1" style="stroke: var(--stone-200)" />
                             <!-- Results -->
                             <rect x="20" y="70" width="100" height="5" rx="1" style="fill: var(--stone-300)" />
                             <rect x="20" y="79" width="80" height="3" rx="1" style="fill: var(--stone-200)" />
@@ -1945,8 +1944,7 @@
                             <text x="141" y="39" font-size="7" text-anchor="middle" font-family="system-ui"
                                 style="fill: var(--stone-500)">esc</text>
                             <!-- Divider line -->
-                            <line x1="28" y1="50" x2="152" y2="50" stroke-width="1"
-                                style="stroke: var(--stone-200)" />
+                            <line x1="28" y1="50" x2="152" y2="50" stroke-width="1" style="stroke: var(--stone-200)" />
                             <!-- Results -->
                             <rect x="28" y="58" width="100" height="5" rx="1" style="fill: var(--stone-300)" />
                             <rect x="28" y="67" width="80" height="3" rx="1" style="fill: var(--stone-200)" />
@@ -2210,7 +2208,7 @@
                     </div>
                     <div class="code-content">
                         <pre class="language-html"><code class="language-html">&lt;!-- Import the library --&gt;
-&lt;script type="module" src="https://<hash>.search.ai.cloudflare.com/assets/v0.0.25/search-snippet.es.js"&gt;&lt;/script&gt;
+&lt;script type="module" src="https://&lt;hash&gt;.search.ai.cloudflare.com/assets/v0.0.25/search-snippet.es.js"&gt;&lt;/script&gt;
 
 &lt;!-- 1. Chat Bubble Widget (Fixed bottom-right) --&gt;
 &lt;chat-bubble-snippet 
@@ -3401,7 +3399,7 @@ export default defineConfig({
     </search-modal-snippet>
 
     <!-- Import the library -->
-    <script type="module" src="/src/main.ts"></script>
+    <script type="module" src="./src/main.ts"></script>
 
     <!-- UnicornStudio animated background -->
     <script>
@@ -3856,7 +3854,7 @@ export default defineConfig({
 
             // Use string concatenation to avoid Vite HTML parser issues with template literals
             let code = '<!-' + '- Import the library -' + '->\n';
-            code += '<' + 'script type="module" src="https://<hash>.search.ai.cloudflare.com/assets/v0.0.25/search-snippet.es.js"><' + '/script>\n\n';
+            code += '<' + 'script type="module" src="https://&lt;hash&gt;.search.ai.cloudflare.com/assets/v0.0.25/search-snippet.es.js"><' + '/script>\n\n';
             code += `<${tag}${propsStr}>\n`;
             code += `</${tag}>`;
             if (cssCode) {
