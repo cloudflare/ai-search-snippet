@@ -66,7 +66,7 @@ export class ChatBubbleSnippet extends HTMLElement {
 
   private getProps(): SearchSnippetProps {
     return {
-      apiUrl: parseAttribute(this.getAttribute('api-url'), 'http://localhost:3000'),
+      apiUrl: parseAttribute(this.getAttribute('api-url'), ''),
       placeholder: parseAttribute(this.getAttribute('placeholder'), 'Type a message...'),
       theme: parseAttribute(this.getAttribute('theme'), 'auto') as 'light' | 'dark' | 'auto',
       hideBranding: parseBooleanAttribute(this.getAttribute('hide-branding'), false),
@@ -78,6 +78,7 @@ export class ChatBubbleSnippet extends HTMLElement {
 
     if (!props.apiUrl) {
       console.error('ChatBubbleSnippet: api-url attribute is required');
+      this.client = null;
       return;
     }
 
@@ -371,10 +372,19 @@ export class ChatBubbleSnippet extends HTMLElement {
   }
 
   private initializeChatView(): void {
-    if (this.chatView || !this.client) return;
+    if (this.chatView) return;
 
     const chatContent = this.shadow.querySelector('.chat-content') as HTMLElement;
     if (!chatContent) return;
+
+    if (!this.client) {
+      chatContent.innerHTML = `
+        <div style="padding: 16px; color: var(--search-snippet-error-color, #ef4444); font-family: var(--search-snippet-font-family, sans-serif); font-size: var(--search-snippet-font-size-base, 14px);">
+          <strong>Error:</strong> The <code>api-url</code> attribute is required. Please provide a valid API URL.
+        </div>
+      `;
+      return;
+    }
 
     const props = this.getProps();
     this.chatView = new ChatView(chatContent, this.client, props);

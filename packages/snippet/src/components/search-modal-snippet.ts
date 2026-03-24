@@ -107,7 +107,7 @@ export class SearchModalSnippet extends HTMLElement {
 
   private getProps(): SearchModalProps {
     return {
-      apiUrl: parseAttribute(this.getAttribute('api-url'), 'http://localhost:3000'),
+      apiUrl: parseAttribute(this.getAttribute('api-url'), ''),
       placeholder: parseAttribute(this.getAttribute('placeholder'), 'Search...'),
       maxResults: parseNumberAttribute(this.getAttribute('max-results'), 10),
       debounceMs: parseNumberAttribute(this.getAttribute('debounce-ms'), 300),
@@ -127,6 +127,8 @@ export class SearchModalSnippet extends HTMLElement {
 
     if (!props.apiUrl) {
       console.error('SearchModalSnippet: api-url attribute is required');
+      this.client = null;
+      this.showMissingApiUrlError();
       return;
     }
 
@@ -212,6 +214,11 @@ export class SearchModalSnippet extends HTMLElement {
     this.footerCount = this.shadow.querySelector('.modal-results-count');
 
     this.attachEventListeners();
+
+    // Show error immediately if api-url was missing when the component was connected
+    if (!this.client) {
+      this.showMissingApiUrlError();
+    }
   }
 
   private attachGlobalKeyboardShortcut(): void {
@@ -352,7 +359,10 @@ export class SearchModalSnippet extends HTMLElement {
   }
 
   private async performSearch(query: string): Promise<void> {
-    if (!this.client) return;
+    if (!this.client) {
+      this.showMissingApiUrlError();
+      return;
+    }
 
     // Cancel any existing request before starting a new one
     if (this.currentSearchController) {
@@ -630,6 +640,12 @@ export class SearchModalSnippet extends HTMLElement {
 
     if (this.footerCount) {
       this.footerCount.textContent = 'Error';
+    }
+  }
+
+  private showMissingApiUrlError(): void {
+    if (this.resultsContainer) {
+      this.showErrorState('The api-url attribute is required. Please provide a valid API URL.');
     }
   }
 

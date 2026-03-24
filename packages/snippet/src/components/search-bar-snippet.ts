@@ -85,7 +85,7 @@ export class SearchBarSnippet extends HTMLElement {
 
   private getProps(): SearchSnippetProps {
     return {
-      apiUrl: parseAttribute(this.getAttribute('api-url'), 'http://localhost:3000'),
+      apiUrl: parseAttribute(this.getAttribute('api-url'), ''),
       placeholder: parseAttribute(this.getAttribute('placeholder'), 'Search...'),
       maxResults: parseNumberAttribute(this.getAttribute('max-results'), 10),
       debounceMs: parseNumberAttribute(this.getAttribute('debounce-ms'), 300),
@@ -103,6 +103,8 @@ export class SearchBarSnippet extends HTMLElement {
 
     if (!props.apiUrl) {
       console.error('SearchBarSnippet: api-url attribute is required');
+      this.client = null;
+      this.showMissingApiUrlError();
       return;
     }
 
@@ -162,6 +164,11 @@ export class SearchBarSnippet extends HTMLElement {
     this.searchButton = this.container.querySelector('.search-submit-button');
 
     this.attachEventListeners();
+
+    // Show error immediately if api-url was missing when the component was connected
+    if (!this.client) {
+      this.showMissingApiUrlError();
+    }
   }
 
   private attachEventListeners(): void {
@@ -211,7 +218,10 @@ export class SearchBarSnippet extends HTMLElement {
   }
 
   private async performSearch(query: string): Promise<void> {
-    if (!this.client) return;
+    if (!this.client) {
+      this.showMissingApiUrlError();
+      return;
+    }
 
     // Cancel any existing request before starting a new one
     if (this.currentSearchController) {
@@ -452,6 +462,12 @@ export class SearchBarSnippet extends HTMLElement {
                 <strong>Error:</strong> ${escapeHTML(message)}
             </div>
         `;
+  }
+
+  private showMissingApiUrlError(): void {
+    if (this.resultsContainer) {
+      this.showErrorState('The api-url attribute is required. Please provide a valid API URL.');
+    }
   }
 
   private updateTheme(theme: string | null): void {
