@@ -44,7 +44,7 @@ export class SearchModalSnippet extends HTMLElement {
   private isOpen = false;
   private results: SearchResult[] = [];
   private activeIndex = -1;
-  private debouncedSearch: ((query: string) => void) | null = null;
+  private debouncedSearch: ((query: string) => void) & { cancel: () => void } | null = null;
   private currentSearchController: AbortController | null = null;
   private loadingMessageInterval: ReturnType<typeof setInterval> | null = null;
   private loadingMessageIndex = 0;
@@ -149,7 +149,7 @@ export class SearchModalSnippet extends HTMLElement {
     this.debouncedSearch = debounce(
       searchFn as (...args: unknown[]) => unknown,
       props.debounceMs || 300
-    ) as (query: string) => void;
+    )
 
     const style = document.createElement('style');
     style.textContent = `${baseStyles}\n${modalStyles}`;
@@ -251,6 +251,8 @@ export class SearchModalSnippet extends HTMLElement {
       if (query.length > 0 && this.debouncedSearch) {
         this.debouncedSearch(query);
       } else {
+        this.debouncedSearch?.cancel();
+        this.currentSearchController?.abort();
         this.results = [];
         this.activeIndex = -1;
         this.showEmptyState();
