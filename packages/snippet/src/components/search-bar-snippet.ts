@@ -239,7 +239,7 @@ export class SearchBarSnippet extends HTMLElement {
       const results = await this.client.search(query, {
         streaming: false,
         signal: this.currentSearchController.signal,
-        maxResults: REQUEST_MAX_RESULTS
+        maxResults: REQUEST_MAX_RESULTS,
       });
       const props = this.getProps();
       const visibleResults = results.slice(0, props.maxResults || DEFAULT_DISPLAY_RESULTS);

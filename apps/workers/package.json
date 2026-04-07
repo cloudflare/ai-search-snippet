@@ -7,10 +7,10 @@
     "clean:wrangler": "node -e \"const fs=require('node:fs');['.wrangler/deploy','../../.wrangler/deploy'].forEach((path)=>{try{fs.rmSync(path,{recursive:true,force:true})}catch{}})\"",
     "dev": "astro dev",
     "dev:worker": "pnpm run clean:wrangler && pnpm run build && wrangler dev",
-    "build": "astro check && astro build",
+    "build": "pnpm --filter @cloudflare/ai-search-snippet run build && astro check && astro build",
     "preview": "pnpm run clean:wrangler && pnpm run build && wrangler dev",
     "preview:static": "astro preview",
-    "typecheck": "astro check",
+    "typecheck": "pnpm --filter @cloudflare/ai-search-snippet run build && astro check",
     "deploy": "pnpm run build && wrangler deploy"
   },
   "dependencies": {
