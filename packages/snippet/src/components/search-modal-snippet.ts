@@ -15,6 +15,7 @@ import {
   debounce,
   escapeHTML,
   formatDate,
+  formatDisplayUrl,
   LOADING_MESSAGE_INTERVAL_MS,
   LOADING_MESSAGES,
   parseAttribute,
@@ -452,6 +453,7 @@ export class SearchModalSnippet extends HTMLElement {
       ? ''
       : this.renderResultImage(result.image, result.title);
     const href = result.url ? escapeHTML(result.url) : '#';
+    const displayUrl = result.url ? escapeHTML(formatDisplayUrl(result.url)) : '';
     const timestampHTML =
       props.showDate && result.timestamp !== undefined
         ? `<div class="modal-result-date">${escapeHTML(formatDate(result.timestamp))}</div>`
@@ -459,7 +461,7 @@ export class SearchModalSnippet extends HTMLElement {
     const metadataHTML =
       (props.showUrl && result.url) || timestampHTML
         ? `<div class="modal-result-metadata">
-            ${props.showUrl && result.url ? `<span class="modal-result-url">${escapeHTML(result.url)}</span>` : '<span class="modal-result-url modal-result-url-empty"></span>'}
+            ${props.showUrl && result.url ? `<span class="modal-result-url">${displayUrl}</span>` : '<span class="modal-result-url modal-result-url-empty"></span>'}
             ${timestampHTML}
           </div>`
         : '';
