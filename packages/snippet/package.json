@@ -47,7 +47,7 @@
   },
   "private": false,
   "devDependencies": {
-    "vite": "^7.3.0",
+    "vite": "^7.3.2",
     "vite-plugin-dts": "^4.5.4",
     "vitest": "^3.2.4"
   },
