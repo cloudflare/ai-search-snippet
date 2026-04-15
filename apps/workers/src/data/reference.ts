@@ -51,6 +51,12 @@ export const API_REFERENCE_SECTIONS: readonly ReferenceSectionData[] = [
           ['show-date', 'boolean', 'false', 'Show result dates when a timestamp is available'],
           ['hide-thumbnails', 'boolean', 'false', 'Hide result thumbnails/images'],
           [
+            'request-options',
+            'JSON string',
+            '-',
+            'Extra search request configuration with headers, query params, and body fields',
+          ],
+          [
             'see-more',
             'string',
             '-',
@@ -83,6 +89,12 @@ export const API_REFERENCE_SECTIONS: readonly ReferenceSectionData[] = [
           ['show-url', 'boolean', 'false', 'Show URL in search results'],
           ['show-date', 'boolean', 'false', 'Show result dates when a timestamp is available'],
           ['hide-thumbnails', 'boolean', 'false', 'Hide result thumbnails/images'],
+          [
+            'request-options',
+            'JSON string',
+            '-',
+            'Extra search request configuration with headers, query params, and body fields',
+          ],
           ['shortcut', 'string', '"k"', 'Keyboard shortcut key (used with Cmd/Ctrl)'],
           [
             'use-meta-key',
@@ -159,6 +171,69 @@ export const API_REFERENCE_SECTIONS: readonly ReferenceSectionData[] = [
           ['getMessages()', '-', 'Message[]', 'Get messages from current session'],
           ['getSessions()', '-', 'ChatSession[]', 'Get all chat sessions'],
           ['getCurrentSession()', '-', 'ChatSession | null', 'Get the current active session'],
+        ],
+      },
+    ],
+  },
+  {
+    id: 'search-request-options',
+    title: 'Search Request Options',
+    description:
+      'Use the `request-options` attribute on search components or the `request` option on `AISearchClient.search()` and `searchStream()` to enrich search requests.',
+    tables: [
+      {
+        columns: ['Key', 'Type', 'Description'],
+        codeColumns: [0],
+        rows: [
+          ['headers', 'Record<string, string>', 'Extra headers to send with search requests'],
+          [
+            'queryParams',
+            'Record<string, string | number | boolean>',
+            'Extra query params appended to the request URL',
+          ],
+          ['body', 'Record<string, unknown>', 'Extra JSON fields merged into the request body'],
+        ],
+      },
+      {
+        title: 'Notes',
+        columns: ['Behavior', 'Details'],
+        rows: [
+          [
+            'Conflict resolution',
+            'Core request fields still win over conflicts: `messages`, `stream`, `max_results`, and the default search `ai_search_options.retrieval.metadata_only` value.',
+          ],
+        ],
+      },
+    ],
+  },
+  {
+    id: 'api-client',
+    title: 'AISearchClient',
+    tables: [
+      {
+        title: 'Methods',
+        columns: ['Method', 'Parameters', 'Returns', 'Description'],
+        codeColumns: [0],
+        defaultColumns: [2],
+        rows: [
+          [
+            'search(query, options?)',
+            'query: string, options?: { maxResults?, signal?, request? }',
+            'Promise<SearchResult[]>',
+            'Perform a search request with optional request enrichment',
+          ],
+          [
+            'searchStream(query, options?)',
+            'query: string, options?: { maxResults?, signal?, request? }',
+            'AsyncGenerator<SearchResult | SearchError>',
+            'Perform a streaming search request with optional request enrichment',
+          ],
+          [
+            'chat(query, options?)',
+            'query: string, options?: { signal? }',
+            'AsyncGenerator<ChatTypes>',
+            'Perform a chat completion request',
+          ],
         ],
       },
     ],

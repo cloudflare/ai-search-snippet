@@ -5,14 +5,104 @@
 
 import type {
   AISearchAPIResponse,
+  ChatOptions,
   ChatTextResponse,
   ChatTypes,
   RequestState,
   SearchError,
   SearchOptions,
+  SearchRequestOptions,
   SearchResult,
 } from '../types/index.ts';
 import { decodeHTMLEntities } from '../utils/index.ts';
+
+type RequestOperation = 'ai-search' | 'search' | 'chat/completions';
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+function deepMergeRecords(
+  ...records: Array<Record<string, unknown> | undefined>
+): Record<string, unknown> {
+  const merged: Record<string, unknown> = {};
+
+  for (const record of records) {
+    if (!record) {
+      continue;
+    }
+
+    for (const [key, value] of Object.entries(record)) {
+      const currentValue = merged[key];
+
+      if (isRecord(currentValue) && isRecord(value)) {
+        merged[key] = deepMergeRecords(currentValue, value);
+      } else {
+        merged[key] = value;
+      }
+    }
+  }
+
+  return merged;
+}
+
+function buildRequestUrl(
+  endpoint: string,
+  queryParams: SearchRequestOptions['queryParams'] | undefined
+): string {
+  if (!isRecord(queryParams)) {
+    return endpoint;
+  }
+
+  const searchParams = new URLSearchParams();
+
+  for (const [key, value] of Object.entries(queryParams)) {
+    if (value === undefined || value === null) {
+      continue;
+    }
+
+    searchParams.append(key, String(value));
+  }
+
+  const query = searchParams.toString();
+
+  if (!query) {
+    return endpoint;
+  }
+
+  const hashIndex = endpoint.indexOf('#');
+  const path = hashIndex === -1 ? endpoint : endpoint.slice(0, hashIndex);
+  const hash = hashIndex === -1 ? '' : endpoint.slice(hashIndex);
+  const separator = path.includes('?') ? '&' : '?';
+
+  return `${path}${separator}${query}${hash}`;
+}
+
+function normalizeHeaders(
+  headers: SearchRequestOptions['headers'] | undefined
+): Record<string, string> {
+  if (!isRecord(headers)) {
+    return {};
+  }
+
+  const normalizedHeaders: Record<string, string> = {};
+
+  for (const [key, value] of Object.entries(headers)) {
+    if (value === undefined || value === null) {
+      continue;
+    }
+
+    normalizedHeaders[key] = String(value);
+  }
+
+  return normalizedHeaders;
+}
+
+function normalizeBody(
+  body: SearchRequestOptions['body'] | undefined
+): Record<string, unknown> | undefined {
+  return isRecord(body) ? body : undefined;
+}
 
 export class AISearchClient {
   activeRequests: Map<string, RequestState> = new Map();
@@ -23,22 +113,19 @@ export class AISearchClient {
   }
 
   private request(
-    options: SearchOptions = {},
-    operation: 'ai-search' | 'search' | 'chat/completions',
-    signal?: AbortSignal
+    body: Record<string, unknown>,
+    operation: RequestOperation,
+    signal?: AbortSignal,
+    requestOptions?: SearchRequestOptions
   ): Promise<Response> {
     const sourceHeader = operation === 'search' ? 'snippet-search' : 'snippet-chat-completions';
-    return fetch(`${this.baseUrl}/${operation}`, {
+    const url = buildRequestUrl(`${this.baseUrl}/${operation}`, requestOptions?.queryParams);
+
+    return fetch(url, {
       method: 'POST',
-      body: JSON.stringify({
-        messages: [{ role: 'user', content: options.query }],
-        stream: options.streaming,
-        max_results: options.maxResults,
-        ...(operation === 'search' && {
-          ai_search_options: { retrieval: { metadata_only: true } },
-        }),
-      }),
+      body: JSON.stringify(deepMergeRecords(normalizeBody(requestOptions?.body), body)),
       headers: {
+        ...normalizeHeaders(requestOptions?.headers),
         'Content-Type': 'application/json',
         'cf-ai-search-source': sourceHeader,
       },
@@ -59,12 +146,18 @@ export class AISearchClient {
     try {
       const response = await this.request(
         {
-          query,
-          streaming: false,
-          maxResults: options.maxResults || 30,
-        } satisfies SearchOptions,
+          messages: [{ role: 'user', content: query }],
+          stream: false,
+          max_results: options.maxResults ?? 30,
+          ai_search_options: {
+            retrieval: {
+              metadata_only: true,
+            },
+          },
+        },
         'search',
-        signal
+        signal,
+        options.request
       );
 
       if (!response.ok) {
@@ -105,21 +198,25 @@ export class AISearchClient {
 
   async *searchStream(
     query: string,
-    options?: SearchOptions
+    options: Omit<SearchOptions, 'query'> = {}
   ): AsyncGenerator<SearchResult | SearchError, void, undefined> {
     const requestId = this.generateRequestId();
     const controller = new AbortController();
-    const signal = options?.signal || controller.signal;
+    const signal = options.signal || controller.signal;
 
     this.registerRequest(requestId, controller);
 
     const response = await this.request(
       {
-        query,
-        streaming: true,
-      } satisfies SearchOptions,
+        messages: [{ role: 'user', content: query }],
+        stream: true,
+        ...(options.maxResults !== undefined && {
+          max_results: options.maxResults,
+        }),
+      },
       'ai-search',
-      signal
+      signal,
+      options.request
     );
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
@@ -161,7 +258,7 @@ export class AISearchClient {
     };
   }
 
-  async *chat(query: string, options?: SearchOptions): AsyncGenerator<ChatTypes, void, undefined> {
+  async *chat(query: string, options?: ChatOptions): AsyncGenerator<ChatTypes, void, undefined> {
     const controller = new AbortController();
     const signal = options?.signal || controller.signal;
     // const prevQueries: string[] = JSON.parse(localStorage.getItem('prevQueries') || '[]');
@@ -169,9 +266,9 @@ export class AISearchClient {
     // localStorage.setItem('prevQueries', JSON.stringify(prevQueries));
     const response = await this.request(
       {
-        query,
-        streaming: false,
-      } satisfies SearchOptions,
+        messages: [{ role: 'user', content: query }],
+        stream: false,
+      },
       'chat/completions',
       signal
     );

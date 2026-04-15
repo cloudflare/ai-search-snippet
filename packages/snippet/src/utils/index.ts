@@ -9,13 +9,15 @@ export { LOADING_MESSAGE_INTERVAL_MS, LOADING_MESSAGES } from './loading-message
 /**
  * Debounce function to limit API calls
  */
-export type DebouncedFn<T extends (...args: unknown[]) => unknown> = ((...args: Parameters<T>) => void) & { cancel: () => void };
+export type DebouncedFn<T extends (...args: unknown[]) => unknown> = ((
+  ...args: Parameters<T>
+) => void) & { cancel: () => void };
 
 export function debounce<T extends (...args: unknown[]) => unknown>(
   func: T,
   wait: number
 ): DebouncedFn<T> {
-  let timeout: number | undefined;
+  let timeout: ReturnType<typeof setTimeout> | undefined;
 
   function executedFunction(...args: Parameters<T>) {
     clearTimeout(timeout);

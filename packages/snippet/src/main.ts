@@ -23,6 +23,7 @@ export type {
   ApiError,
   ChatOptions,
   SearchOptions,
+  SearchRequestOptions,
   SearchResult,
   SearchSnippetProps,
   Theme,

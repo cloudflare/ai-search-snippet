@@ -1,5 +1,14 @@
 ---
 import { DEMO_API_URL } from '../data/configurator.ts';
+
+const requestOptions = {
+  headers: {
+    'X-Custom-Header': 'custom-value',
+  },
+  queryParams: {
+    'x-custom-query': 'custom-query-value',
+  },
+};
 ---
 
 <search-modal-snippet
@@ -12,4 +21,5 @@ import { DEMO_API_URL } from '../data/configurator.ts';
   max-results="10"
   show-date="true"
   see-more="https://developers.cloudflare.com/search/?q="
+  request-options={JSON.stringify(requestOptions)}
 ></search-modal-snippet>

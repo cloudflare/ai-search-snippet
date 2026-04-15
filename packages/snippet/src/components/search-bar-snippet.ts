@@ -7,7 +7,7 @@ import type { AISearchClient } from '../api/ai-search.ts';
 import { POWERED_BY_BRANDING } from '../constants.ts';
 import { searchStyles } from '../styles/search.ts';
 import { baseStyles } from '../styles/theme.ts';
-import type { SearchResult, SearchSnippetProps } from '../types/index.ts';
+import type { SearchRequestOptions, SearchResult, SearchSnippetProps } from '../types/index.ts';
 import {
   createClient,
   createCustomEvent,
@@ -55,6 +55,7 @@ export class SearchBarSnippet extends HTMLElement {
       'show-date',
       'hide-thumbnails',
       'see-more',
+      'request-options',
     ] as const;
   }
 
@@ -98,6 +99,31 @@ export class SearchBarSnippet extends HTMLElement {
       hideThumbnails: parseBooleanAttribute(this.getAttribute('hide-thumbnails'), false),
       seeMore: parseAttribute(this.getAttribute('see-more'), ''),
     };
+  }
+
+  private getRequestOptions(): SearchRequestOptions | undefined {
+    const rawRequestOptions = this.getAttribute('request-options');
+
+    if (!rawRequestOptions) {
+      return undefined;
+    }
+
+    try {
+      const parsedRequestOptions = JSON.parse(rawRequestOptions) as unknown;
+
+      if (
+        parsedRequestOptions === null ||
+        typeof parsedRequestOptions !== 'object' ||
+        Array.isArray(parsedRequestOptions)
+      ) {
+        throw new Error('request-options must be a JSON object');
+      }
+
+      return parsedRequestOptions as SearchRequestOptions;
+    } catch (error) {
+      console.error('SearchBarSnippet: invalid request-options attribute', error);
+      return undefined;
+    }
   }
 
   private initializeClient(): void {
@@ -237,9 +263,9 @@ export class SearchBarSnippet extends HTMLElement {
 
     try {
       const results = await this.client.search(query, {
-        streaming: false,
         signal: this.currentSearchController.signal,
         maxResults: REQUEST_MAX_RESULTS,
+        request: this.getRequestOptions(),
       });
       const props = this.getProps();
       const visibleResults = results.slice(0, props.maxResults || DEFAULT_DISPLAY_RESULTS);

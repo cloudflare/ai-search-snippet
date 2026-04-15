@@ -107,6 +107,7 @@ Additional attributes for `<search-bar-snippet>` and `<search-modal-snippet>`:
 | `debounce-ms` | number  | `300`   | Input debounce delay in milliseconds             |
 | `show-url`    | boolean | `false` | Show URL in search results                       |
 | `show-date`   | boolean | `false` | Show result dates when a timestamp is available  |
+| `request-options` | JSON string | - | Extra headers, query params, and body fields for search requests |
 
 ### Modal-Specific Attributes
 
@@ -116,6 +117,30 @@ Additional attributes for `<search-modal-snippet>`:
 | -------------- | ------- | ------- | ------------------------------------------ |
 | `shortcut`     | string  | `'k'`   | Keyboard shortcut key (with Cmd/Ctrl)      |
 | `use-meta-key` | boolean | `true`  | Use meta key (Cmd on Mac, Ctrl on Windows) |
+
+### Search Request Enrichment
+
+Use `request-options` on `<search-bar-snippet>` and `<search-modal-snippet>` to enrich the
+request sent to the search endpoints.
+
+```html
+<search-bar-snippet
+  api-url="https://api.example.com"
+  request-options='{"headers":{"x-tenant":"docs"},"queryParams":{"locale":"en"},"body":{"ai_search_options":{"filters":{"tag":"guides"}}}}'
+>
+</search-bar-snippet>
+```
+
+The JSON object supports:
+
+| Key | Type | Description |
+| --- | ---- | ----------- |
+| `headers` | `Record<string, string>` | Extra headers to send with the search request |
+| `queryParams` | `Record<string, string \| number \| boolean>` | Extra query params appended to the request URL |
+| `body` | `Record<string, unknown>` | Extra JSON fields merged into the request body |
+
+Core request fields still win over conflicts: `messages`, `stream`, `max_results`, and the
+default `ai_search_options.retrieval.metadata_only` search behavior.
 
 ### JavaScript API
 
@@ -353,10 +378,12 @@ chat-bubble-snippet {
 
 ```typescript
 import {
+  AISearchClient,
   SearchBarSnippet,
   SearchModalSnippet,
   ChatBubbleSnippet,
   ChatPageSnippet,
+  type SearchRequestOptions,
   type SearchSnippetProps,
 } from "@cloudflare/ai-search-snippet";
 
@@ -372,6 +399,23 @@ const chatBubble = document.createElement(
 ) as ChatBubbleSnippet;
 chatBubble.setAttribute("api-url", "https://api.example.com");
 await chatBubble.sendMessage("Hello, world!");
+
+const requestOptions: SearchRequestOptions = {
+  headers: { "x-tenant": "docs" },
+  queryParams: { locale: "en" },
+  body: {
+    ai_search_options: {
+      filters: { tag: "guides" },
+    },
+  },
+};
+
+searchBar.setAttribute("request-options", JSON.stringify(requestOptions));
+
+const client = new AISearchClient("https://api.example.com");
+const results = await client.search("workers", {
+  request: requestOptions,
+});
 ```
 
 ### React Integration

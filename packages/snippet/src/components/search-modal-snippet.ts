@@ -8,7 +8,7 @@ import type { AISearchClient } from '../api/ai-search.ts';
 import { POWERED_BY_BRANDING } from '../constants.ts';
 import { modalStyles } from '../styles/modal.ts';
 import { baseStyles } from '../styles/theme.ts';
-import type { SearchResult, SearchSnippetProps } from '../types/index.ts';
+import type { SearchRequestOptions, SearchResult, SearchSnippetProps } from '../types/index.ts';
 import {
   createClient,
   createCustomEvent,
@@ -44,7 +44,7 @@ export class SearchModalSnippet extends HTMLElement {
   private isOpen = false;
   private results: SearchResult[] = [];
   private activeIndex = -1;
-  private debouncedSearch: ((query: string) => void) & { cancel: () => void } | null = null;
+  private debouncedSearch: (((query: string) => void) & { cancel: () => void }) | null = null;
   private currentSearchController: AbortController | null = null;
   private loadingMessageInterval: ReturnType<typeof setInterval> | null = null;
   private loadingMessageIndex = 0;
@@ -78,6 +78,7 @@ export class SearchModalSnippet extends HTMLElement {
       'show-date',
       'hide-thumbnails',
       'see-more',
+      'request-options',
     ] as const;
   }
 
@@ -124,6 +125,31 @@ export class SearchModalSnippet extends HTMLElement {
     };
   }
 
+  private getRequestOptions(): SearchRequestOptions | undefined {
+    const rawRequestOptions = this.getAttribute('request-options');
+
+    if (!rawRequestOptions) {
+      return undefined;
+    }
+
+    try {
+      const parsedRequestOptions = JSON.parse(rawRequestOptions) as unknown;
+
+      if (
+        parsedRequestOptions === null ||
+        typeof parsedRequestOptions !== 'object' ||
+        Array.isArray(parsedRequestOptions)
+      ) {
+        throw new Error('request-options must be a JSON object');
+      }
+
+      return parsedRequestOptions as SearchRequestOptions;
+    } catch (error) {
+      console.error('SearchModalSnippet: invalid request-options attribute', error);
+      return undefined;
+    }
+  }
+
   private initializeClient(): void {
     const props = this.getProps();
 
@@ -149,7 +175,7 @@ export class SearchModalSnippet extends HTMLElement {
     this.debouncedSearch = debounce(
       searchFn as (...args: unknown[]) => unknown,
       props.debounceMs || 300
-    )
+    );
 
     const style = document.createElement('style');
     style.textContent = `${baseStyles}\n${modalStyles}`;
@@ -380,9 +406,9 @@ export class SearchModalSnippet extends HTMLElement {
 
     try {
       const results = await this.client.search(query, {
-        streaming: false,
         signal: this.currentSearchController.signal,
         maxResults: REQUEST_MAX_RESULTS,
+        request: this.getRequestOptions(),
       });
       const props = this.getProps();
       this.results = results.slice(0, props.maxResults || DEFAULT_DISPLAY_RESULTS);
@@ -404,7 +430,6 @@ export class SearchModalSnippet extends HTMLElement {
     query: string,
     totalResults = results.length
   ): void {
-    console.log({ results, query, totalResults });
     this.clearLoadingInterval();
     if (!this.resultsContainer) return;
 

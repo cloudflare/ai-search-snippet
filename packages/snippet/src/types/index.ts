@@ -74,6 +74,18 @@ export type ChatError = {
 export type ChatTypes = ChatResult | ChatTextResponse | ChatError;
 
 /**
+ * Additional request fields for search requests
+ */
+export interface SearchRequestOptions {
+  /** Additional JSON fields to merge into the request body */
+  body?: Record<string, unknown>;
+  /** Additional headers to send with the request */
+  headers?: Record<string, string>;
+  /** Additional query parameters to append to the request URL */
+  queryParams?: Record<string, boolean | number | string | null | undefined>;
+}
+
+/**
  * Search options
  */
 export interface SearchOptions {
@@ -82,6 +94,8 @@ export interface SearchOptions {
   signal?: AbortSignal;
   /** Maximum search results to request from the API */
   maxResults?: number;
+  /** Additional request fields for search endpoints */
+  request?: SearchRequestOptions;
 }
 
 /**

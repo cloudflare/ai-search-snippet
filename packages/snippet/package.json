@@ -41,6 +41,7 @@
   "homepage": "https://github.com/cloudflare/ai-search-snippet#readme",
   "scripts": {
     "build": "tsc --noEmit && vite build",
+    "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "prepublishOnly": "pnpm run build"
   },
