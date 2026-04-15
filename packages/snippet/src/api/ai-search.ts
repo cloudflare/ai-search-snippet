@@ -181,7 +181,10 @@ export class AISearchClient {
               timestamp: chunk.item.timestamp ?? undefined,
               url: chunk.item.key,
               image: chunk.item.metadata?.image || undefined,
-              metadata: chunk.item.metadata as unknown as Record<string, unknown>,
+              metadata: {
+                ...(chunk.item.metadata as unknown as Record<string, unknown>),
+                instance_id: chunk.instance_id,
+              },
             }) satisfies SearchResult
         );
       }

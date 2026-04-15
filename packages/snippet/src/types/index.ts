@@ -149,6 +149,7 @@ export interface Chunk {
   type: string;
   text: string;
   item: Item;
+  instance_id?: string;
   scoring_details: ScoringDetails;
 }
 
