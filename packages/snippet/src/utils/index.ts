@@ -50,6 +50,17 @@ export function escapeHTML(text: string): string {
 }
 
 /**
+ * Decode percent-encoded URLs for display
+ */
+export function formatDisplayUrl(url: string): string {
+  try {
+    return decodeURI(url);
+  } catch {
+    return url;
+  }
+}
+
+/**
  * Decode HTML entities (e.g., &#38; -> &, &amp; -> &)
  */
 export function decodeHTMLEntities(text: string): string {
