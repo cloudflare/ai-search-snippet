@@ -24,7 +24,7 @@ import {
 
 const COMPONENT_NAME = 'search-bar-snippet';
 const DEFAULT_DISPLAY_RESULTS = 10;
-const REQUEST_MAX_RESULTS = 100;
+const REQUEST_MAX_RESULTS = 50;
 
 export class SearchBarSnippet extends HTMLElement {
   private shadow: ShadowRoot;

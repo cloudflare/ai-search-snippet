@@ -25,7 +25,7 @@ import {
 
 const COMPONENT_NAME = 'search-modal-snippet';
 const DEFAULT_DISPLAY_RESULTS = 10;
-const REQUEST_MAX_RESULTS = 100;
+const REQUEST_MAX_RESULTS = 50;
 
 export interface SearchModalProps extends SearchSnippetProps {
   /** Keyboard shortcut key (default: 'k') */
