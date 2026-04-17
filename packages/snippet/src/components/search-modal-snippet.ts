@@ -62,6 +62,7 @@ export class SearchModalSnippet extends HTMLElement {
     position: string;
     top: string;
     width: string;
+    scrollbarGutter: string;
   } | null = null;
   private savedHtmlOverflow: string | null = null;
 
@@ -709,10 +710,13 @@ export class SearchModalSnippet extends HTMLElement {
       position: document.body.style.position,
       top: document.body.style.top,
       width: document.body.style.width,
+      scrollbarGutter: document.body.style.scrollbarGutter,
     };
+
     this.savedHtmlOverflow = document.documentElement.style.overflow;
 
     // Apply scroll lock styles to both html and body for cross-browser support
+    document.body.style.scrollbarGutter = 'stable';
     document.documentElement.style.overflow = 'hidden';
     document.body.style.overflow = 'hidden';
     document.body.style.position = 'fixed';
@@ -732,6 +736,7 @@ export class SearchModalSnippet extends HTMLElement {
     document.body.style.position = this.savedBodyStyles.position;
     document.body.style.top = this.savedBodyStyles.top;
     document.body.style.width = this.savedBodyStyles.width;
+    document.body.style.scrollbarGutter = this.savedBodyStyles.scrollbarGutter || '';
 
     // Restore scroll position
     window.scrollTo(0, scrollY);
