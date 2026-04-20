@@ -127,6 +127,7 @@ export class AISearchClient {
       headers: {
         ...normalizeHeaders(requestOptions?.headers),
         'Content-Type': 'application/json',
+        Accept: body.stream ? 'text/event-stream' : 'application/json',
         'cf-ai-search-source': sourceHeader,
       },
       signal,
