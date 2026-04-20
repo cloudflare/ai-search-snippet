@@ -7,7 +7,7 @@ export interface SnippetMeta {
   tabLabel: string;
 }
 
-export const SNIPPET_VERSION = '0.0.36';
+export const SNIPPET_VERSION = '0.0.37';
 
 export const SNIPPETS = [
   {

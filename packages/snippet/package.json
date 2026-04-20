@@ -1,6 +1,6 @@
 {
   "name": "@cloudflare/ai-search-snippet",
-  "version": "0.0.36",
+  "version": "0.0.37",
   "description": "A production-ready, self-contained TypeScript Web Component library for search and chat interfaces with streaming support",
   "type": "module",
   "main": "./dist/search-snippet.umd.js",
