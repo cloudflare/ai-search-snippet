@@ -139,7 +139,7 @@ The JSON object supports:
 | `queryParams` | `Record<string, string \| number \| boolean>` | Extra query params appended to the request URL |
 | `body` | `Record<string, unknown>` | Extra JSON fields merged into the request body |
 
-Core request fields still win over conflicts: `messages`, `stream`, `max_results`, and the
+Core request fields still win over conflicts: `messages`, `stream`, `max_num_results`, and the
 default `ai_search_options.retrieval.metadata_only` search behavior.
 
 ### JavaScript API
@@ -545,7 +545,7 @@ Request:
 ```json
 {
   "query": "search query",
-  "max_results": 10,
+  "max_num_results": 10,
   "filters": {}
 }
 ```

@@ -5,6 +5,12 @@
 
 import type { AISearchClient } from '../api/ai-search.ts';
 import { POWERED_BY_BRANDING } from '../constants.ts';
+import {
+  interpolate,
+  mergeTranslations,
+  parseTranslationsAttribute,
+  type Translations,
+} from '../i18n/index.ts';
 import { searchStyles } from '../styles/search.ts';
 import { baseStyles } from '../styles/theme.ts';
 import type { SearchRequestOptions, SearchResult, SearchSnippetProps } from '../types/index.ts';
@@ -16,7 +22,6 @@ import {
   formatDate,
   formatDisplayUrl,
   LOADING_MESSAGE_INTERVAL_MS,
-  LOADING_MESSAGES,
   parseAttribute,
   parseBooleanAttribute,
   parseNumberAttribute,
@@ -37,6 +42,8 @@ export class SearchBarSnippet extends HTMLElement {
   private currentSearchController: AbortController | null = null;
   private loadingMessageInterval: ReturnType<typeof setInterval> | null = null;
   private loadingMessageIndex = 0;
+  private translationsOverride: Translations | null = null;
+  private resolvedTranslations = mergeTranslations(null);
 
   // Event handler references for cleanup
   private handleInputChange: ((e: Event) => void) | null = null;
@@ -57,6 +64,7 @@ export class SearchBarSnippet extends HTMLElement {
       'hide-thumbnails',
       'see-more',
       'request-options',
+      'translations',
     ] as const;
   }
 
@@ -66,6 +74,7 @@ export class SearchBarSnippet extends HTMLElement {
   }
 
   connectedCallback(): void {
+    this.syncTranslationsFromAttribute();
     this.initializeClient();
     this.render();
     this.dispatchEvent(createCustomEvent('ready', undefined));
@@ -84,13 +93,66 @@ export class SearchBarSnippet extends HTMLElement {
       // Theme changes are handled automatically by CSS :host([theme]) selectors
       // But we trigger this to ensure any dynamic updates are applied
       this.updateTheme(newValue);
+    } else if (name === 'translations') {
+      this.syncTranslationsFromAttribute();
+      if (this.isConnected) {
+        this.rerender();
+      }
     }
   }
 
+  /**
+   * Get the current translations object. Mirrors the property getter.
+   */
+  public get translations(): Translations | null {
+    return this.translationsOverride;
+  }
+
+  /**
+   * Override any user-facing string. Omitted keys fall back to English defaults.
+   */
+  public set translations(value: Translations | null | undefined) {
+    this.translationsOverride = value ?? null;
+    this.resolvedTranslations = mergeTranslations(this.translationsOverride);
+    if (this.isConnected) {
+      this.rerender();
+    }
+  }
+
+  /**
+   * Re-render preserving the current query and re-running the search so
+   * results remain visible after a translations change at runtime.
+   */
+  private rerender(): void {
+    const previousQuery = this.inputElement?.value ?? '';
+    this.render();
+    if (previousQuery && this.inputElement) {
+      this.inputElement.value = previousQuery;
+      // Re-run immediately so the results area isn't left in the empty state.
+      if (previousQuery.trim().length > 0) {
+        this.performSearch(previousQuery.trim());
+      }
+    }
+  }
+
+  private syncTranslationsFromAttribute(): void {
+    // If a property was set imperatively, it takes precedence over the attribute.
+    if (this.translationsOverride) {
+      this.resolvedTranslations = mergeTranslations(this.translationsOverride);
+      return;
+    }
+    const parsed = parseTranslationsAttribute(
+      this.getAttribute('translations'),
+      'SearchBarSnippet'
+    );
+    this.resolvedTranslations = mergeTranslations(parsed);
+  }
+
   private getProps(): SearchSnippetProps {
+    const t = this.resolvedTranslations;
     return {
       apiUrl: parseAttribute(this.getAttribute('api-url'), ''),
-      placeholder: parseAttribute(this.getAttribute('placeholder'), 'Search...'),
+      placeholder: parseAttribute(this.getAttribute('placeholder'), t.placeholder),
       maxResults: parseNumberAttribute(this.getAttribute('max-results'), 10),
       debounceMs: parseNumberAttribute(this.getAttribute('debounce-ms'), 300),
       theme: parseAttribute(this.getAttribute('theme'), 'auto') as 'light' | 'dark' | 'auto',
@@ -99,6 +161,7 @@ export class SearchBarSnippet extends HTMLElement {
       showDate: parseBooleanAttribute(this.getAttribute('show-date'), false),
       hideThumbnails: parseBooleanAttribute(this.getAttribute('hide-thumbnails'), false),
       seeMore: parseAttribute(this.getAttribute('see-more'), ''),
+      translations: this.translationsOverride ?? undefined,
     };
   }
 
@@ -146,6 +209,7 @@ export class SearchBarSnippet extends HTMLElement {
 
   private render(): void {
     const props = this.getProps();
+    const t = this.resolvedTranslations;
 
     // Create debounced search function
     const searchFn = (query: string) => this.performSearch(query);
@@ -167,12 +231,12 @@ export class SearchBarSnippet extends HTMLElement {
                         type="text"
                         name="search-input"
                         class="search-input"
-                        placeholder="${escapeHTML(props.placeholder || 'Search...')}"
-                        aria-label="Search input"
+                        placeholder="${escapeHTML(props.placeholder || t.placeholder)}"
+                        aria-label="${escapeHTML(t.searchInputAriaLabel)}"
                         autocomplete="off"
                     />
-                    <button class="button search-submit-button" aria-label="Search">
-                        <span>Search</span>
+                    <button class="button search-submit-button" aria-label="${escapeHTML(t.searchButtonLabel)}">
+                        <span>${escapeHTML(t.searchButtonLabel)}</span>
                     </button>
                 </div>
                 <div class="search-content">
@@ -295,19 +359,22 @@ export class SearchBarSnippet extends HTMLElement {
       return;
     }
     const props = this.getProps();
+    const t = this.resolvedTranslations;
     const brandingHTML = props.hideBranding
       ? ''
       : `<div class="powered-by-inline">${POWERED_BY_BRANDING}</div>`;
     const hasMoreResults = totalResults > results.length;
     const resultsCountLabel = hasMoreResults
-      ? `Showing ${results.length} of ${totalResults} results`
-      : `Found ${totalResults} result${totalResults === 1 ? '' : 's'}`;
+      ? interpolate(t.resultsCountOverflow, { n: results.length, total: totalResults })
+      : interpolate(totalResults === 1 ? t.resultsCount : t.resultsCountPlural, {
+          n: totalResults,
+        });
 
     const seeMoreHTML =
       props.seeMore && hasMoreResults
         ? `<div class="search-footer">
             <a href="${escapeHTML(props.seeMore + encodeURIComponent(query))}" class="search-see-more">
-              <span>See more results</span>
+              <span>${escapeHTML(t.seeMoreResults)}</span>
               <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
             </a>
           </div>`
@@ -316,7 +383,7 @@ export class SearchBarSnippet extends HTMLElement {
     const resultsHTML = `
             <div class="search-header">
                 <div class="search-count">
-                    ${resultsCountLabel}
+                    ${escapeHTML(resultsCountLabel)}
                 </div>
                 ${brandingHTML}
             </div>
@@ -427,12 +494,14 @@ export class SearchBarSnippet extends HTMLElement {
     if (!this.resultsContainer) return;
 
     this.clearLoadingInterval();
-    this.loadingMessageIndex = Math.floor(Math.random() * LOADING_MESSAGES.length);
+    const messages = this.resolvedTranslations.loadingMessages;
+    this.loadingMessageIndex = Math.floor(Math.random() * messages.length);
+    const t = this.resolvedTranslations;
 
     this.resultsContainer.innerHTML = `
             <div class="search-loading">
-                <div class="loading" aria-label="Loading"></div>
-                <div class="loading-text loading-text-animate">${LOADING_MESSAGES[this.loadingMessageIndex]}</div>
+                <div class="loading" aria-label="${escapeHTML(t.loadingAriaLabel)}"></div>
+                <div class="loading-text loading-text-animate">${escapeHTML(messages[this.loadingMessageIndex])}</div>
             </div>
         `;
 
@@ -441,12 +510,13 @@ export class SearchBarSnippet extends HTMLElement {
 
   private startLoadingInterval(): void {
     this.loadingMessageInterval = setInterval(() => {
-      this.loadingMessageIndex = (this.loadingMessageIndex + 1) % LOADING_MESSAGES.length;
+      const messages = this.resolvedTranslations.loadingMessages;
+      this.loadingMessageIndex = (this.loadingMessageIndex + 1) % messages.length;
       const textEl = this.resultsContainer?.querySelector('.loading-text');
       if (textEl) {
         textEl.classList.remove('loading-text-animate');
         void (textEl as HTMLElement).offsetWidth;
-        textEl.textContent = LOADING_MESSAGES[this.loadingMessageIndex];
+        textEl.textContent = messages[this.loadingMessageIndex];
         textEl.classList.add('loading-text-animate');
       }
     }, LOADING_MESSAGE_INTERVAL_MS);
@@ -462,6 +532,7 @@ export class SearchBarSnippet extends HTMLElement {
   private showEmptyState(): void {
     this.clearLoadingInterval();
     if (!this.resultsContainer) return;
+    const t = this.resolvedTranslations;
 
     this.resultsContainer.innerHTML = `
             <div class="search-empty">
@@ -469,9 +540,9 @@ export class SearchBarSnippet extends HTMLElement {
                     <circle cx="11" cy="11" r="8"></circle>
                     <path d="m21 21-4.35-4.35"></path>
                 </svg>
-                <div class="search-empty-title">Start Searching</div>
+                <div class="search-empty-title">${escapeHTML(t.emptyStateTitle)}</div>
                 <div class="search-empty-description">
-                    Enter a query to search for results
+                    ${escapeHTML(t.emptyStateDescription)}
                 </div>
             </div>
         `;
@@ -480,6 +551,7 @@ export class SearchBarSnippet extends HTMLElement {
   private showNoResultsState(query: string): void {
     this.clearLoadingInterval();
     if (!this.resultsContainer) return;
+    const t = this.resolvedTranslations;
 
     this.resultsContainer.innerHTML = `
             <div class="search-empty">
@@ -487,9 +559,9 @@ export class SearchBarSnippet extends HTMLElement {
                     <circle cx="11" cy="11" r="8"></circle>
                     <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
                 </svg>
-                <div class="search-empty-title">No Results Found</div>
+                <div class="search-empty-title">${escapeHTML(t.noResultsTitle)}</div>
                 <div class="search-empty-description">
-                    No results found for "${escapeHTML(query)}"
+                    ${escapeHTML(interpolate(t.noResultsDescription, { query }))}
                 </div>
             </div>
         `;
@@ -498,17 +570,18 @@ export class SearchBarSnippet extends HTMLElement {
   private showErrorState(message: string): void {
     this.clearLoadingInterval();
     if (!this.resultsContainer) return;
+    const t = this.resolvedTranslations;
 
     this.resultsContainer.innerHTML = `
             <div class="error">
-                <strong>Error:</strong> ${escapeHTML(message)}
+                <strong>${escapeHTML(t.errorPrefix)}</strong> ${escapeHTML(message)}
             </div>
         `;
   }
 
   private showMissingApiUrlError(): void {
     if (this.resultsContainer) {
-      this.showErrorState('The api-url attribute is required. Please provide a valid API URL.');
+      this.showErrorState(this.resolvedTranslations.missingApiUrlError);
     }
   }
 

@@ -77,7 +77,7 @@ describe('AISearchClient request enrichment', () => {
     const client = new AISearchClient('https://example.com/');
 
     const results = await client.search('cloudflare', {
-      maxResults: 5,
+      maxResults: 99,
       request: {
         headers: {
           'x-tenant': 'docs',
@@ -94,7 +94,7 @@ describe('AISearchClient request enrichment', () => {
           ai_search_options: {
             retrieval: {
               metadata_only: false,
-              max_results: 99,
+              max_num_results: 99,
               top_k: 5,
             },
             filters: {
@@ -123,7 +123,7 @@ describe('AISearchClient request enrichment', () => {
       ai_search_options: {
         retrieval: {
           metadata_only: true,
-          max_results: 5,
+          max_num_results: 99,
           top_k: 5,
         },
         filters: {
@@ -168,7 +168,7 @@ describe('AISearchClient request enrichment', () => {
     expect(body).toEqual({
       messages: [{ role: 'user', content: 'streaming query' }],
       stream: true,
-      max_results: 3,
+      max_num_results: 3,
       custom: 'stream',
     });
     expect(streamResults).toEqual([

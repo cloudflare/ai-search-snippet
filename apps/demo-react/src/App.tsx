@@ -1,35 +1,35 @@
-import { useRef, useState } from 'react';
-import viteLogo from '/vite.svg';
-import reactLogo from './assets/react.svg';
+import { useEffect, useRef } from 'react';
 import './App.css';
-import type { SearchModalSnippet } from '@cloudflare/ai-search-snippet';
+import type {
+  SearchBarSnippet,
+  SearchModalSnippet,
+  Translations,
+} from '@cloudflare/ai-search-snippet';
+
+// Partial translation map; omitted keys fall back to English defaults.
+const SPANISH_TRANSLATIONS: Translations = {
+  placeholder: 'Busca aquí...',
+  searchButtonLabel: 'Buscar',
+  emptyStateTitle: 'Empieza a buscar',
+  emptyStateDescription: 'Escribe una consulta para ver resultados',
+  noResultsTitle: 'Sin resultados',
+  noResultsDescription: 'No hay resultados para "{query}"',
+};
 
 function App() {
-  const [count, setCount] = useState(0);
-
+  const searchBarRef = useRef<SearchBarSnippet>(null);
   const searchModalRef = useRef<SearchModalSnippet>(null);
+
+  // Translations are a rich object — set them imperatively through the ref.
+  useEffect(() => {
+    if (searchBarRef.current) {
+      searchBarRef.current.translations = SPANISH_TRANSLATIONS;
+    }
+  }, []);
 
   return (
     <>
-      <div>
-        <a href="https://vite.dev" target="_blank" rel="noopener">
-          <img src={viteLogo} className="logo" alt="Vite logo" />
-        </a>
-        <a href="https://react.dev" target="_blank" rel="noopener">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
-      </div>
-      <h1>Vite + React</h1>
-      <div className="card">
-        <button onClick={() => setCount((count) => count + 1)} type="button">
-          count is {count}
-        </button>
-        <p>
-          Edit <code>src/App.tsx</code> and save to test HMR
-        </p>
-      </div>
-      <p className="read-the-docs">Click on the Vite and React logos to learn more</p>
-      <search-bar-snippet apiUrl="http://localhost:8787" />
+      <search-bar-snippet apiUrl="http://localhost:8787" ref={searchBarRef} />
       <br />
 
       <button
@@ -41,7 +41,11 @@ function App() {
         Show Modal Search (CMD+K)
       </button>
 
-      <search-modal-snippet apiUrl="http://localhost:8787" ref={searchModalRef} />
+      <search-modal-snippet
+        apiUrl="http://localhost:8787"
+        ref={searchModalRef}
+        translations={JSON.stringify({ placeholder: 'Busca documentación...' })}
+      />
     </>
   );
 }

@@ -3,6 +3,7 @@
  */
 
 import { AISearchClient } from '../api/ai-search.ts';
+import { interpolate, mergeTranslations, type Translations } from '../i18n/index.ts';
 
 export { LOADING_MESSAGE_INTERVAL_MS, LOADING_MESSAGES } from './loading-messages.ts';
 
@@ -69,28 +70,35 @@ export function decodeHTMLEntities(text: string): string {
 }
 
 /**
- * Format timestamp to readable date
+ * Format timestamp to readable date.
+ *
+ * Accepts an optional `Translations` map (or a `Required<Translations>`
+ * already merged with defaults) so relative-time strings can be localized.
+ * Falls back to built-in English if no translations are provided.
  */
-export function formatTimestamp(timestamp: number): string {
+export function formatTimestamp(timestamp: number, translations?: Translations): string {
+  const t = mergeTranslations(translations);
   const date = new Date(timestamp);
   const now = new Date();
   const diff = now.getTime() - date.getTime();
 
   // Less than a minute
   if (diff < 60000) {
-    return 'Just now';
+    return t.justNow;
   }
 
   // Less than an hour
   if (diff < 3600000) {
     const minutes = Math.floor(diff / 60000);
-    return `${minutes} ${minutes === 1 ? 'minute' : 'minutes'} ago`;
+    const template = minutes === 1 ? t.minuteAgo : t.minutesAgo;
+    return interpolate(template, { n: minutes });
   }
 
   // Less than a day
   if (diff < 86400000) {
     const hours = Math.floor(diff / 3600000);
-    return `${hours} ${hours === 1 ? 'hour' : 'hours'} ago`;
+    const template = hours === 1 ? t.hourAgo : t.hoursAgo;
+    return interpolate(template, { n: hours });
   }
 
   // Format as date

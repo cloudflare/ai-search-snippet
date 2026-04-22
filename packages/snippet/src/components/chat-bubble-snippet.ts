@@ -6,12 +6,14 @@
 
 import type { AISearchClient } from '../api/ai-search.ts';
 import { POWERED_BY_BRANDING } from '../constants.ts';
+import { mergeTranslations, parseTranslationsAttribute, type Translations } from '../i18n/index.ts';
 import { chatStyles } from '../styles/chat.ts';
 import { baseStyles } from '../styles/theme.ts';
 import type { SearchSnippetProps } from '../types/index.ts';
 import {
   createClient,
   createCustomEvent,
+  escapeHTML,
   parseAttribute,
   parseBooleanAttribute,
 } from '../utils/index.ts';
@@ -27,6 +29,8 @@ export class ChatBubbleSnippet extends HTMLElement {
   private container: HTMLElement | null = null;
   private isExpanded = false;
   private isMinimized = false;
+  private translationsOverride: Translations | null = null;
+  private resolvedTranslations = mergeTranslations(null);
 
   // Event handler references for cleanup
   private handleBubbleClick: (() => void) | null = null;
@@ -35,7 +39,7 @@ export class ChatBubbleSnippet extends HTMLElement {
   private handleClearClick: (() => void) | null = null;
 
   static get observedAttributes() {
-    return ['api-url', 'placeholder', 'theme', 'hide-branding'] as const;
+    return ['api-url', 'placeholder', 'theme', 'hide-branding', 'translations'] as const;
   }
 
   constructor() {
@@ -44,6 +48,7 @@ export class ChatBubbleSnippet extends HTMLElement {
   }
 
   connectedCallback(): void {
+    this.syncTranslationsFromAttribute();
     this.render();
     this.initializeClient();
     this.dispatchEvent(createCustomEvent('ready', undefined));
@@ -61,15 +66,92 @@ export class ChatBubbleSnippet extends HTMLElement {
     } else if (name === 'theme') {
       // Theme changes are handled automatically by CSS :host([theme]) selectors
       this.updateTheme(newValue);
+    } else if (name === 'translations') {
+      this.syncTranslationsFromAttribute();
+      if (this.isConnected) {
+        this.rerenderAfterTranslationsChange();
+      }
+    }
+  }
+
+  /**
+   * Get the current translations object.
+   */
+  public get translations(): Translations | null {
+    return this.translationsOverride;
+  }
+
+  /**
+   * Override any user-facing string. Omitted keys fall back to English defaults.
+   */
+  public set translations(value: Translations | null | undefined) {
+    this.translationsOverride = value ?? null;
+    this.resolvedTranslations = mergeTranslations(this.translationsOverride);
+    if (this.isConnected) {
+      this.rerenderAfterTranslationsChange();
+    }
+  }
+
+  private syncTranslationsFromAttribute(): void {
+    if (this.translationsOverride) {
+      this.resolvedTranslations = mergeTranslations(this.translationsOverride);
+      return;
+    }
+    const parsed = parseTranslationsAttribute(
+      this.getAttribute('translations'),
+      'ChatBubbleSnippet'
+    );
+    this.resolvedTranslations = mergeTranslations(parsed);
+  }
+
+  private rerenderAfterTranslationsChange(): void {
+    // Preserve expanded/minimized state across re-render. Also preserve the
+    // existing ChatView (and thus any in-flight stream) by re-parenting its
+    // container into the new shell rather than destroying it.
+    const wasExpanded = this.isExpanded;
+    const wasMinimized = this.isMinimized;
+    this.removeEventListeners();
+
+    const previousChatContent = this.chatView
+      ? (this.shadow.querySelector('.chat-content') as HTMLElement | null)
+      : null;
+    if (previousChatContent?.parentNode) {
+      previousChatContent.parentNode.removeChild(previousChatContent);
+    }
+
+    this.render();
+
+    if (wasExpanded) {
+      this.shadow.querySelector('.bubble-button')?.classList.add('hidden');
+      this.shadow.querySelector('.chat-window')?.classList.add('expanded');
+      if (wasMinimized) {
+        this.shadow.querySelector('.chat-window')?.classList.add('minimized');
+      }
+    }
+
+    const chatWindow = this.shadow.querySelector('.chat-window');
+    if (this.chatView && previousChatContent && chatWindow) {
+      const placeholder = chatWindow.querySelector('.chat-content');
+      if (placeholder) {
+        chatWindow.replaceChild(previousChatContent, placeholder);
+      } else {
+        chatWindow.appendChild(previousChatContent);
+      }
+      this.chatView.setProps(this.getProps());
+    } else if (wasExpanded) {
+      // No pre-existing view (e.g. missing api-url); render the fresh one.
+      this.initializeChatView();
     }
   }
 
   private getProps(): SearchSnippetProps {
+    const t = this.resolvedTranslations;
     return {
       apiUrl: parseAttribute(this.getAttribute('api-url'), ''),
-      placeholder: parseAttribute(this.getAttribute('placeholder'), 'Type a message...'),
+      placeholder: parseAttribute(this.getAttribute('placeholder'), t.chatPlaceholder),
       theme: parseAttribute(this.getAttribute('theme'), 'auto') as 'light' | 'dark' | 'auto',
       hideBranding: parseBooleanAttribute(this.getAttribute('hide-branding'), false),
+      translations: this.translationsOverride ?? undefined,
     };
   }
 
@@ -248,12 +330,13 @@ export class ChatBubbleSnippet extends HTMLElement {
 
   private getBaseHTML(): string {
     const props = this.getProps();
+    const t = this.resolvedTranslations;
     const brandingHTML = props.hideBranding
       ? ''
       : `<div class="powered-by">${POWERED_BY_BRANDING}</div>`;
 
     return `
-      <button class="bubble-button" aria-label="Open chat">
+      <button class="bubble-button" aria-label="${escapeHTML(t.openChatAriaLabel)}">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
         </svg>
@@ -264,21 +347,21 @@ export class ChatBubbleSnippet extends HTMLElement {
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
             </svg>
-            <span>Chat</span>
+            <span>${escapeHTML(t.chatTitle)}</span>
           </div>
           <div class="chat-header-actions">
-            <button class="icon-button clear-button" aria-label="Clear history">
+            <button class="icon-button clear-button" aria-label="${escapeHTML(t.clearHistoryAriaLabel)}">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <polyline points="3 6 5 6 21 6"></polyline>
                 <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
               </svg>
             </button>
-            <button class="icon-button minimize-button" aria-label="Minimize">
+            <button class="icon-button minimize-button" aria-label="${escapeHTML(t.minimizeAriaLabel)}">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <line x1="5" y1="12" x2="19" y2="12"></line>
               </svg>
             </button>
-            <button class="icon-button close-button" aria-label="Close">
+            <button class="icon-button close-button" aria-label="${escapeHTML(t.closeAriaLabel)}">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <line x1="18" y1="6" x2="6" y2="18"></line>
                 <line x1="6" y1="6" x2="18" y2="18"></line>
@@ -378,9 +461,10 @@ export class ChatBubbleSnippet extends HTMLElement {
     if (!chatContent) return;
 
     if (!this.client) {
+      const t = this.resolvedTranslations;
       chatContent.innerHTML = `
         <div style="padding: 16px; color: var(--search-snippet-error-color, #ef4444); font-family: var(--search-snippet-font-family, sans-serif); font-size: var(--search-snippet-font-size-base, 14px);">
-          <strong>Error:</strong> The <code>api-url</code> attribute is required. Please provide a valid API URL.
+          <strong>${escapeHTML(t.errorPrefix)}</strong> ${escapeHTML(t.missingApiUrlError)}
         </div>
       `;
       return;

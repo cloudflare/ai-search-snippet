@@ -4,6 +4,7 @@
  */
 
 import type { AISearchClient } from '../api/ai-search.ts';
+import { mergeTranslations } from '../i18n/index.ts';
 import type { SearchSnippetProps } from '../types/index.ts';
 import {
   createCustomEvent,
@@ -11,7 +12,6 @@ import {
   formatTimestamp,
   generateId,
   LOADING_MESSAGE_INTERVAL_MS,
-  LOADING_MESSAGES,
 } from '../utils/index.ts';
 import { markdownToHtml } from '../utils/markdown.ts';
 export interface Message {
@@ -25,6 +25,7 @@ export class ChatView {
   private container: HTMLElement;
   private client: AISearchClient;
   private props: SearchSnippetProps;
+  private translations: ReturnType<typeof mergeTranslations>;
   private inputElement: HTMLTextAreaElement | null = null;
   private messagesContainer: HTMLElement | null = null;
   private sendButton: HTMLButtonElement | null = null;
@@ -43,6 +44,7 @@ export class ChatView {
     this.container = container;
     this.client = client;
     this.props = props;
+    this.translations = mergeTranslations(props.translations);
 
     this.render();
     this.attachEventListeners();
@@ -52,30 +54,23 @@ export class ChatView {
    * Render the chat interface
    */
   private render(): void {
+    const t = this.translations;
     this.container.innerHTML = `
       <div class="chat-container">
         <div class="chat-messages">
-          <div class="chat-empty">
-            <svg class="chat-empty-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
-            </svg>
-            <div class="chat-empty-title">Start a Conversation</div>
-            <div class="chat-empty-description">
-              Send a message to begin chatting
-            </div>
-          </div>
+          ${this.renderEmptyStateHTML()}
         </div>
         <div class="chat-input-area">
           <div class="chat-input-wrapper">
             <textarea
               class="chat-input"
-              placeholder="${escapeHTML(this.props.placeholder || 'Type a message...')}"
-              aria-label="Chat message input"
+              placeholder="${escapeHTML(this.props.placeholder || t.chatPlaceholder)}"
+              aria-label="${escapeHTML(t.chatInputAriaLabel)}"
               style="height: 40px;"
               rows="1"
             ></textarea>
-            <button class="button chat-send-button" aria-label="Send message">
-              <span>Send</span>
+            <button class="button chat-send-button" aria-label="${escapeHTML(t.sendButtonAriaLabel)}">
+              <span>${escapeHTML(t.sendButtonLabel)}</span>
             </button>
           </div>
         </div>
@@ -85,6 +80,21 @@ export class ChatView {
     this.messagesContainer = this.container.querySelector('.chat-messages');
     this.inputElement = this.container.querySelector('.chat-input');
     this.sendButton = this.container.querySelector('.chat-send-button');
+  }
+
+  private renderEmptyStateHTML(): string {
+    const t = this.translations;
+    return `
+      <div class="chat-empty">
+        <svg class="chat-empty-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+        </svg>
+        <div class="chat-empty-title">${escapeHTML(t.chatEmptyTitle)}</div>
+        <div class="chat-empty-description">
+          ${escapeHTML(t.chatEmptyDescription)}
+        </div>
+      </div>
+    `;
   }
 
   /**
@@ -174,7 +184,10 @@ export class ChatView {
           fullContent += chunk.message;
           this.updateStreamingMessage(assistantMessageId, fullContent);
         } else if (chunk.type === 'error') {
-          this.showErrorInMessage(assistantMessageId, chunk.message || 'Unknown error');
+          this.showErrorInMessage(
+            assistantMessageId,
+            chunk.message || this.translations.unknownError
+          );
           break;
         }
         // else if (chunk.type === 'done') {
@@ -234,7 +247,7 @@ export class ChatView {
   private showErrorInMessage(messageId: string, error: string): void {
     const messageIndex = this.messages.findIndex((m) => m.id === messageId);
     if (messageIndex !== -1) {
-      this.messages[messageIndex].content = `Error: ${error}`;
+      this.messages[messageIndex].content = `${this.translations.errorPrefix} ${error}`;
       this.renderMessages();
     }
   }
@@ -246,17 +259,7 @@ export class ChatView {
     if (!this.messagesContainer) return;
 
     if (this.messages.length === 0) {
-      this.messagesContainer.innerHTML = `
-        <div class="chat-empty">
-          <svg class="chat-empty-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
-          </svg>
-          <div class="chat-empty-title">Start a Conversation</div>
-          <div class="chat-empty-description">
-            Send a message to begin chatting
-          </div>
-        </div>
-      `;
+      this.messagesContainer.innerHTML = this.renderEmptyStateHTML();
       return;
     }
 
@@ -276,19 +279,21 @@ export class ChatView {
    * Render a single message
    */
   private renderMessage(message: Message, isStreaming = false): string {
+    const t = this.translations;
     const roleClass = `chat-message-${message.role}`;
-    const avatar = message.role === 'user' ? 'U' : 'AI';
+    const avatar = message.role === 'user' ? t.userAvatar : t.assistantAvatar;
+    const loadingMessage = t.loadingMessages[this.loadingMessageIndex] ?? '';
 
     return `
       <div class="chat-message ${roleClass}">
-        <div class="chat-message-avatar">${avatar}</div>
+        <div class="chat-message-avatar">${escapeHTML(avatar)}</div>
         <div class="chat-message-content">
           <div class="chat-message-bubble">
             ${message.content ? `<div class="chat-message-text">${markdownToHtml(message.content)}</div>` : ''}
-            ${isStreaming ? `<div class="chat-streaming"><span class="chat-streaming-dot"></span><span class="chat-streaming-dot"></span><span class="chat-streaming-dot"></span><span class="loading-text">${LOADING_MESSAGES[this.loadingMessageIndex]}</span></div>` : ''}
+            ${isStreaming ? `<div class="chat-streaming"><span class="chat-streaming-dot"></span><span class="chat-streaming-dot"></span><span class="chat-streaming-dot"></span><span class="loading-text">${escapeHTML(loadingMessage)}</span></div>` : ''}
           </div>
           <div class="chat-message-metadata">
-            <span class="chat-message-time">${formatTimestamp(message.timestamp)}</span>
+            <span class="chat-message-time">${escapeHTML(formatTimestamp(message.timestamp, this.translations))}</span>
           </div>
         </div>
       </div>
@@ -320,7 +325,9 @@ export class ChatView {
 
     if (this.sendButton) {
       this.sendButton.disabled = streaming;
-      this.sendButton.innerHTML = streaming ? '<div class="loading"></div>' : '<span>Send</span>';
+      this.sendButton.innerHTML = streaming
+        ? '<div class="loading"></div>'
+        : `<span>${escapeHTML(this.translations.sendButtonLabel)}</span>`;
     }
 
     if (streaming) {
@@ -331,9 +338,14 @@ export class ChatView {
   }
 
   private startLoadingMessages(): void {
-    this.loadingMessageIndex = Math.floor(Math.random() * LOADING_MESSAGES.length);
+    // Guard against double-starting (e.g. setStreamingState(true) called twice
+    // via setProps during an active stream).
+    this.clearLoadingMessages();
+    const messages = this.translations.loadingMessages;
+    this.loadingMessageIndex = Math.floor(Math.random() * messages.length);
     this.loadingMessageInterval = setInterval(() => {
-      this.loadingMessageIndex = (this.loadingMessageIndex + 1) % LOADING_MESSAGES.length;
+      const current = this.translations.loadingMessages;
+      this.loadingMessageIndex = (this.loadingMessageIndex + 1) % current.length;
       if (this.isStreaming) {
         this.renderMessages(true);
       }
@@ -368,6 +380,44 @@ export class ChatView {
   public setMessages(messages: Message[]): void {
     this.messages = [...messages];
     this.renderMessages();
+  }
+
+  /**
+   * Update the props (e.g. placeholder / translations) and re-render.
+   *
+   * Safe to call at any time: existing messages and streaming state are
+   * preserved; listeners on the old DOM are removed and re-attached to the
+   * newly rendered elements.
+   */
+  public setProps(props: SearchSnippetProps): void {
+    this.props = props;
+    this.translations = mergeTranslations(props.translations);
+    this.detachEventListeners();
+    this.render();
+    this.attachEventListeners();
+    this.renderMessages(this.isStreaming);
+    // Re-apply streaming UI state (disabled input, spinner button, loading
+    // messages) since render() reset the DOM to its idle state.
+    if (this.isStreaming) {
+      this.setStreamingState(true);
+    }
+  }
+
+  private detachEventListeners(): void {
+    if (this.inputElement) {
+      if (this.handleInputResize) {
+        this.inputElement.removeEventListener('input', this.handleInputResize);
+      }
+      if (this.handleInputKeydown) {
+        this.inputElement.removeEventListener('keydown', this.handleInputKeydown);
+      }
+    }
+    if (this.sendButton && this.handleSendClick) {
+      this.sendButton.removeEventListener('click', this.handleSendClick);
+    }
+    this.handleInputResize = null;
+    this.handleInputKeydown = null;
+    this.handleSendClick = null;
   }
 
   /**

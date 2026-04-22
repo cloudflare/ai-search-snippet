@@ -17,6 +17,9 @@ export { ChatBubbleSnippet } from './components/chat-bubble-snippet.ts';
 export { ChatPageSnippet } from './components/chat-page-snippet.ts';
 export { SearchBarSnippet } from './components/search-bar-snippet.ts';
 export { SearchModalSnippet } from './components/search-modal-snippet.ts';
+export type { Translations } from './i18n/index.ts';
+// Export i18n utilities and translation types
+export { DEFAULT_TRANSLATIONS, mergeTranslations } from './i18n/index.ts';
 
 // Export types for TypeScript users
 export type {

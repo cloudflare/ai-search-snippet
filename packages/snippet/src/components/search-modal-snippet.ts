@@ -6,6 +6,12 @@
 
 import type { AISearchClient } from '../api/ai-search.ts';
 import { POWERED_BY_BRANDING } from '../constants.ts';
+import {
+  interpolate,
+  mergeTranslations,
+  parseTranslationsAttribute,
+  type Translations,
+} from '../i18n/index.ts';
 import { modalStyles } from '../styles/modal.ts';
 import { baseStyles } from '../styles/theme.ts';
 import type { SearchRequestOptions, SearchResult, SearchSnippetProps } from '../types/index.ts';
@@ -17,7 +23,6 @@ import {
   formatDate,
   formatDisplayUrl,
   LOADING_MESSAGE_INTERVAL_MS,
-  LOADING_MESSAGES,
   parseAttribute,
   parseBooleanAttribute,
   parseNumberAttribute,
@@ -49,6 +54,8 @@ export class SearchModalSnippet extends HTMLElement {
   private currentSearchController: AbortController | null = null;
   private loadingMessageInterval: ReturnType<typeof setInterval> | null = null;
   private loadingMessageIndex = 0;
+  private translationsOverride: Translations | null = null;
+  private resolvedTranslations = mergeTranslations(null);
 
   // Event handler references for cleanup
   private handleGlobalKeydown: ((e: KeyboardEvent) => void) | null = null;
@@ -81,6 +88,7 @@ export class SearchModalSnippet extends HTMLElement {
       'hide-thumbnails',
       'see-more',
       'request-options',
+      'translations',
     ] as const;
   }
 
@@ -90,6 +98,7 @@ export class SearchModalSnippet extends HTMLElement {
   }
 
   connectedCallback(): void {
+    this.syncTranslationsFromAttribute();
     this.initializeClient();
     this.render();
     this.attachGlobalKeyboardShortcut();
@@ -107,13 +116,81 @@ export class SearchModalSnippet extends HTMLElement {
       this.initializeClient();
     } else if (name === 'theme') {
       this.updateTheme(newValue);
+    } else if (name === 'translations') {
+      this.syncTranslationsFromAttribute();
+      if (this.isConnected) {
+        this.rerender();
+      }
     }
   }
 
+  /**
+   * Get the current translations object.
+   */
+  public get translations(): Translations | null {
+    return this.translationsOverride;
+  }
+
+  /**
+   * Override any user-facing string. Omitted keys fall back to English defaults.
+   */
+  public set translations(value: Translations | null | undefined) {
+    this.translationsOverride = value ?? null;
+    this.resolvedTranslations = mergeTranslations(this.translationsOverride);
+    if (this.isConnected) {
+      this.rerender();
+    }
+  }
+
+  /**
+   * Re-render while preserving open state and the current query. Results are
+   * re-fetched so the list reflects the updated translation strings around
+   * them (counts, footer hints, etc.). Selection resets to none — the same
+   * behavior as the immediate post-search state.
+   */
+  private rerender(): void {
+    const wasOpen = this.isOpen;
+    const previousQuery = this.inputElement?.value ?? '';
+    // render() replaces the DOM but does not touch isOpen, so flip it to
+    // false so open() will re-apply the `.open` class on the new elements.
+    // Skip the scroll-lock side effects since they are already in place.
+    this.isOpen = false;
+    this.render();
+    if (wasOpen) {
+      this.isOpen = true;
+      this.backdrop?.classList.add('open');
+      this.modal?.classList.add('open');
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          this.inputElement?.focus();
+        });
+      });
+    }
+    if (previousQuery && this.inputElement) {
+      this.inputElement.value = previousQuery;
+      if (previousQuery.trim().length > 0) {
+        this.performSearch(previousQuery.trim());
+      }
+    }
+  }
+
+  private syncTranslationsFromAttribute(): void {
+    if (this.translationsOverride) {
+      this.resolvedTranslations = mergeTranslations(this.translationsOverride);
+      return;
+    }
+    const parsed = parseTranslationsAttribute(
+      this.getAttribute('translations'),
+      'SearchModalSnippet'
+    );
+    this.resolvedTranslations = mergeTranslations(parsed);
+  }
+
   private getProps(): SearchModalProps {
+    const t = this.resolvedTranslations;
     return {
       apiUrl: parseAttribute(this.getAttribute('api-url'), ''),
-      placeholder: parseAttribute(this.getAttribute('placeholder'), 'Search...'),
+      placeholder: parseAttribute(this.getAttribute('placeholder'), t.placeholder),
       maxResults: parseNumberAttribute(this.getAttribute('max-results'), 10),
       debounceMs: parseNumberAttribute(this.getAttribute('debounce-ms'), 300),
       theme: parseAttribute(this.getAttribute('theme'), 'auto') as 'light' | 'dark' | 'auto',
@@ -124,6 +201,7 @@ export class SearchModalSnippet extends HTMLElement {
       showDate: parseBooleanAttribute(this.getAttribute('show-date'), false),
       hideThumbnails: parseBooleanAttribute(this.getAttribute('hide-thumbnails'), false),
       seeMore: parseAttribute(this.getAttribute('see-more'), ''),
+      translations: this.translationsOverride ?? undefined,
     };
   }
 
@@ -171,6 +249,7 @@ export class SearchModalSnippet extends HTMLElement {
 
   private render(): void {
     const props = this.getProps();
+    const t = this.resolvedTranslations;
 
     // Create debounced search function
     const searchFn = (query: string) => this.performSearch(query);
@@ -197,8 +276,8 @@ export class SearchModalSnippet extends HTMLElement {
           <input
             type="text"
             class="modal-search-input"
-            placeholder="${escapeHTML(props.placeholder || 'Search...')}"
-            aria-label="Search"
+            placeholder="${escapeHTML(props.placeholder || t.placeholder)}"
+            aria-label="${escapeHTML(t.searchButtonLabel)}"
             aria-autocomplete="list"
             aria-controls="modal-results-list"
             aria-expanded="false"
@@ -207,7 +286,7 @@ export class SearchModalSnippet extends HTMLElement {
           />
         </div>
         <div class="modal-content">
-          <div class="modal-results" id="modal-results-list" role="listbox" aria-label="Search results">
+          <div class="modal-results" id="modal-results-list" role="listbox" aria-label="${escapeHTML(t.searchResultsAriaLabel)}">
             ${this.renderEmptyState()}
           </div>
         </div>
@@ -216,15 +295,15 @@ export class SearchModalSnippet extends HTMLElement {
             <div class="modal-footer-hint">
               <kbd class="modal-kbd">↑</kbd>
               <kbd class="modal-kbd">↓</kbd>
-              <span>Navigate</span>
+              <span>${escapeHTML(t.navigateHint)}</span>
             </div>
             <div class="modal-footer-hint">
               <kbd class="modal-kbd">↵</kbd>
-              <span>Select</span>
+              <span>${escapeHTML(t.selectHint)}</span>
             </div>
             <div class="modal-footer-hint">
               <kbd class="modal-kbd">Esc</kbd>
-              <span>Close</span>
+              <span>${escapeHTML(t.closeHint)}</span>
             </div>
           </div>
           ${brandingHTML}
@@ -441,15 +520,18 @@ export class SearchModalSnippet extends HTMLElement {
     }
 
     const props = this.getProps();
+    const t = this.resolvedTranslations;
     const resultsHTML = results.map((result, index) => this.renderResult(result, index)).join('');
     const hasMoreResults = totalResults > results.length;
     const resultsCountLabel = hasMoreResults
-      ? `Showing ${results.length} of ${totalResults} results`
-      : `${totalResults} result${totalResults === 1 ? '' : 's'}`;
+      ? interpolate(t.resultsCountOverflow, { n: results.length, total: totalResults })
+      : interpolate(totalResults === 1 ? t.modalResultsCount : t.modalResultsCountPlural, {
+          n: totalResults,
+        });
     const seeMoreHTML =
       props.seeMore && hasMoreResults
         ? `<a href="${escapeHTML(props.seeMore + encodeURIComponent(query))}" class="modal-see-more">
-            <span>See more results</span>
+            <span>${escapeHTML(t.seeMoreResults)}</span>
             <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
           </a>`
         : '';
@@ -579,13 +661,14 @@ export class SearchModalSnippet extends HTMLElement {
   }
 
   private renderEmptyState(): string {
+    const t = this.resolvedTranslations;
     return `
       <div class="modal-empty">
         <svg class="modal-empty-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <circle cx="11" cy="11" r="8"></circle>
           <path d="m21 21-4.35-4.35"></path>
         </svg>
-        <div class="modal-empty-description">Start typing to search</div>
+        <div class="modal-empty-description">${escapeHTML(t.modalEmptyStateDescription)}</div>
       </div>
     `;
   }
@@ -608,17 +691,19 @@ export class SearchModalSnippet extends HTMLElement {
     if (!this.resultsContainer) return;
 
     this.clearLoadingInterval();
-    this.loadingMessageIndex = Math.floor(Math.random() * LOADING_MESSAGES.length);
+    const messages = this.resolvedTranslations.loadingMessages;
+    const t = this.resolvedTranslations;
+    this.loadingMessageIndex = Math.floor(Math.random() * messages.length);
 
     this.resultsContainer.innerHTML = `
       <div class="modal-loading">
-        <div class="loading" aria-label="Loading"></div>
-        <div class="loading-text loading-text-animate">${LOADING_MESSAGES[this.loadingMessageIndex]}</div>
+        <div class="loading" aria-label="${escapeHTML(t.loadingAriaLabel)}"></div>
+        <div class="loading-text loading-text-animate">${escapeHTML(messages[this.loadingMessageIndex])}</div>
       </div>
     `;
 
     if (this.footerCount) {
-      this.footerCount.textContent = LOADING_MESSAGES[this.loadingMessageIndex];
+      this.footerCount.textContent = messages[this.loadingMessageIndex];
     }
 
     this.startLoadingInterval();
@@ -626,16 +711,17 @@ export class SearchModalSnippet extends HTMLElement {
 
   private startLoadingInterval(): void {
     this.loadingMessageInterval = setInterval(() => {
-      this.loadingMessageIndex = (this.loadingMessageIndex + 1) % LOADING_MESSAGES.length;
+      const messages = this.resolvedTranslations.loadingMessages;
+      this.loadingMessageIndex = (this.loadingMessageIndex + 1) % messages.length;
       const textEl = this.resultsContainer?.querySelector('.loading-text');
       if (textEl) {
         textEl.classList.remove('loading-text-animate');
         void (textEl as HTMLElement).offsetWidth;
-        textEl.textContent = LOADING_MESSAGES[this.loadingMessageIndex];
+        textEl.textContent = messages[this.loadingMessageIndex];
         textEl.classList.add('loading-text-animate');
       }
       if (this.footerCount) {
-        this.footerCount.textContent = LOADING_MESSAGES[this.loadingMessageIndex];
+        this.footerCount.textContent = messages[this.loadingMessageIndex];
       }
     }, LOADING_MESSAGE_INTERVAL_MS);
   }
@@ -650,6 +736,7 @@ export class SearchModalSnippet extends HTMLElement {
   private showNoResultsState(query: string): void {
     this.clearLoadingInterval();
     if (!this.resultsContainer) return;
+    const t = this.resolvedTranslations;
 
     this.resultsContainer.innerHTML = `
       <div class="modal-empty">
@@ -657,13 +744,13 @@ export class SearchModalSnippet extends HTMLElement {
           <circle cx="11" cy="11" r="8"></circle>
           <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
         </svg>
-        <div class="modal-empty-title">No results found</div>
-        <div class="modal-empty-description">No results for "${escapeHTML(query)}"</div>
+        <div class="modal-empty-title">${escapeHTML(t.modalNoResultsTitle)}</div>
+        <div class="modal-empty-description">${escapeHTML(interpolate(t.modalNoResultsDescription, { query }))}</div>
       </div>
     `;
 
     if (this.footerCount) {
-      this.footerCount.textContent = '0 results';
+      this.footerCount.textContent = t.modalResultsCountZero;
     }
 
     if (this.inputElement) {
@@ -674,21 +761,22 @@ export class SearchModalSnippet extends HTMLElement {
   private showErrorState(message: string): void {
     this.clearLoadingInterval();
     if (!this.resultsContainer) return;
+    const t = this.resolvedTranslations;
 
     this.resultsContainer.innerHTML = `
       <div class="error">
-        <strong>Error:</strong> ${escapeHTML(message)}
+        <strong>${escapeHTML(t.errorPrefix)}</strong> ${escapeHTML(message)}
       </div>
     `;
 
     if (this.footerCount) {
-      this.footerCount.textContent = 'Error';
+      this.footerCount.textContent = t.modalResultsCountError;
     }
   }
 
   private showMissingApiUrlError(): void {
     if (this.resultsContainer) {
-      this.showErrorState('The api-url attribute is required. Please provide a valid API URL.');
+      this.showErrorState(this.resolvedTranslations.missingApiUrlError);
     }
   }
 

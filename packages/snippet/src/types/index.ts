@@ -2,6 +2,8 @@
  * Core type definitions for the Search Snippet Library
  */
 
+import type { Translations } from '../i18n/index.ts';
+
 export type Theme = 'light' | 'dark' | 'auto';
 
 /**
@@ -28,6 +30,15 @@ export interface SearchSnippetProps {
   hideThumbnails?: boolean;
   /** URL template for "See more" link. The search query is appended URL-encoded. Example: "https://example.com/search?q=" */
   seeMore?: string;
+  /**
+   * Override any user-facing string. Omitted keys fall back to English defaults.
+   *
+   * @example
+   * ```ts
+   * element.translations = { placeholder: 'Busca aquí...' };
+   * ```
+   */
+  translations?: Translations;
 }
 
 /**
