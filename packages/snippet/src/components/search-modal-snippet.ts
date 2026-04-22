@@ -29,8 +29,8 @@ import {
 } from '../utils/index.ts';
 
 const COMPONENT_NAME = 'search-modal-snippet';
-const DEFAULT_DISPLAY_RESULTS = 10;
-const REQUEST_MAX_RESULTS = 50;
+const DEFAULT_RENDER_RESULTS = 10;
+const DEFAULT_REQUEST_MAX_RESULTS = 50;
 
 export interface SearchModalProps extends SearchSnippetProps {
   /** Keyboard shortcut key (default: 'k') */
@@ -78,6 +78,7 @@ export class SearchModalSnippet extends HTMLElement {
       'api-url',
       'placeholder',
       'max-results',
+      'max-render-results',
       'theme',
       'shortcut',
       'use-meta-key',
@@ -191,7 +192,14 @@ export class SearchModalSnippet extends HTMLElement {
     return {
       apiUrl: parseAttribute(this.getAttribute('api-url'), ''),
       placeholder: parseAttribute(this.getAttribute('placeholder'), t.placeholder),
-      maxResults: parseNumberAttribute(this.getAttribute('max-results'), 10),
+      maxResults: parseNumberAttribute(
+        this.getAttribute('max-results'),
+        DEFAULT_REQUEST_MAX_RESULTS
+      ),
+      maxRenderResults: parseNumberAttribute(
+        this.getAttribute('max-render-results'),
+        DEFAULT_RENDER_RESULTS
+      ),
       debounceMs: parseNumberAttribute(this.getAttribute('debounce-ms'), 300),
       theme: parseAttribute(this.getAttribute('theme'), 'auto') as 'light' | 'dark' | 'auto',
       shortcut: parseAttribute(this.getAttribute('shortcut'), 'k'),
@@ -486,13 +494,13 @@ export class SearchModalSnippet extends HTMLElement {
     this.showLoadingState();
 
     try {
+      const props = this.getProps();
       const results = await this.client.search(query, {
         signal: this.currentSearchController.signal,
-        maxResults: REQUEST_MAX_RESULTS,
+        maxResults: props.maxResults || DEFAULT_REQUEST_MAX_RESULTS,
         request: this.getRequestOptions(),
       });
-      const props = this.getProps();
-      this.results = results.slice(0, props.maxResults || DEFAULT_DISPLAY_RESULTS);
+      this.results = results.slice(0, props.maxRenderResults || DEFAULT_RENDER_RESULTS);
       this.activeIndex = this.results.length > 0 ? 0 : -1;
       this.displayResults(this.results, query, results.length);
     } catch (error) {

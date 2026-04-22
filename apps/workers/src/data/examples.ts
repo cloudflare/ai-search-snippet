@@ -28,7 +28,8 @@ export const QUICK_START_EXAMPLES = [
 <search-bar-snippet 
     api-url="https://api.example.com"
     placeholder="Search..."
-    max-results="10"
+    max-results="50"
+    max-render-results="10"
     show-url="true"
     show-date="true">
 </search-bar-snippet>
@@ -69,7 +70,8 @@ export default function App() {
       <search-bar-snippet 
         apiUrl="https://api.example.com"
         placeholder="Search..."
-        maxResults={10}
+        maxResults={50}
+        maxRenderResults={10}
         show-url="true"
         show-date="true"
       />
@@ -105,7 +107,8 @@ import { ref } from 'vue';
 
 const apiUrl = 'https://api.example.com';
 const searchPlaceholder = ref('Search...');
-const maxResults = ref(10);
+const maxResults = ref(50);
+const maxRenderResults = ref(10);
 
 // Handle custom events from components
 function onSearchComplete(event: CustomEvent) {
@@ -124,6 +127,7 @@ function onChatMessage(event: CustomEvent) {
       :api-url="apiUrl"
       :placeholder="searchPlaceholder"
       :max-results="maxResults"
+      :max-render-results="maxRenderResults"
       show-url="true"
       show-date="true"
       @search-complete="onSearchComplete"

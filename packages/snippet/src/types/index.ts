@@ -14,8 +14,10 @@ export interface SearchSnippetProps {
   apiUrl: string;
   /** Input placeholder text */
   placeholder?: string;
-  /** Maximum search results to display  */
+  /** Maximum search results to request from the API */
   maxResults?: number;
+  /** Maximum search results to render in the UI (caps the visible list and drives the "see more" affordance) */
+  maxRenderResults?: number;
   /** Input debounce delay in milliseconds (search-bar only) */
   debounceMs?: number;
   /** Color scheme */

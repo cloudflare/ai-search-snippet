@@ -28,8 +28,8 @@ import {
 } from '../utils/index.ts';
 
 const COMPONENT_NAME = 'search-bar-snippet';
-const DEFAULT_DISPLAY_RESULTS = 10;
-const REQUEST_MAX_RESULTS = 50;
+const DEFAULT_RENDER_RESULTS = 10;
+const DEFAULT_REQUEST_MAX_RESULTS = 50;
 
 export class SearchBarSnippet extends HTMLElement {
   private shadow: ShadowRoot;
@@ -56,6 +56,7 @@ export class SearchBarSnippet extends HTMLElement {
       'api-url',
       'placeholder',
       'max-results',
+      'max-render-results',
       'debounce-ms',
       'theme',
       'hide-branding',
@@ -153,7 +154,14 @@ export class SearchBarSnippet extends HTMLElement {
     return {
       apiUrl: parseAttribute(this.getAttribute('api-url'), ''),
       placeholder: parseAttribute(this.getAttribute('placeholder'), t.placeholder),
-      maxResults: parseNumberAttribute(this.getAttribute('max-results'), 10),
+      maxResults: parseNumberAttribute(
+        this.getAttribute('max-results'),
+        DEFAULT_REQUEST_MAX_RESULTS
+      ),
+      maxRenderResults: parseNumberAttribute(
+        this.getAttribute('max-render-results'),
+        DEFAULT_RENDER_RESULTS
+      ),
       debounceMs: parseNumberAttribute(this.getAttribute('debounce-ms'), 300),
       theme: parseAttribute(this.getAttribute('theme'), 'auto') as 'light' | 'dark' | 'auto',
       hideBranding: parseBooleanAttribute(this.getAttribute('hide-branding'), false),
@@ -327,13 +335,13 @@ export class SearchBarSnippet extends HTMLElement {
     this.showLoadingState();
 
     try {
+      const props = this.getProps();
       const results = await this.client.search(query, {
         signal: this.currentSearchController.signal,
-        maxResults: REQUEST_MAX_RESULTS,
+        maxResults: props.maxResults || DEFAULT_REQUEST_MAX_RESULTS,
         request: this.getRequestOptions(),
       });
-      const props = this.getProps();
-      const visibleResults = results.slice(0, props.maxResults || DEFAULT_DISPLAY_RESULTS);
+      const visibleResults = results.slice(0, props.maxRenderResults || DEFAULT_RENDER_RESULTS);
       this.displayResults(visibleResults, query, results.length);
     } catch (error) {
       // Don't show error state for cancelled requests

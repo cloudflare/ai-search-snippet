@@ -42,7 +42,8 @@ yarn add @cloudflare/ai-search-snippet
 <search-bar-snippet
   api-url="https:/<hash>/search.ai.cloudflare.com/"
   placeholder="Search..."
-  max-results="10"
+  max-results="50"
+  max-render-results="10"
   show-url="true"
   show-date="true"
 >
@@ -52,7 +53,8 @@ yarn add @cloudflare/ai-search-snippet
 <search-modal-snippet
   api-url="https:/<hash>/search.ai.cloudflare.com/"
   placeholder="Search documentation..."
-  max-results="10"
+  max-results="50"
+  max-render-results="10"
   show-url="true"
   show-date="true"
 >
@@ -101,13 +103,14 @@ These attributes are available on all components:
 
 Additional attributes for `<search-bar-snippet>` and `<search-modal-snippet>`:
 
-| Attribute     | Type    | Default | Description                                      |
-| ------------- | ------- | ------- | ------------------------------------------------ |
-| `max-results` | number  | `10`    | Maximum search results to display                |
-| `debounce-ms` | number  | `300`   | Input debounce delay in milliseconds             |
-| `show-url`    | boolean | `false` | Show URL in search results                       |
-| `show-date`   | boolean | `false` | Show result dates when a timestamp is available  |
-| `request-options` | JSON string | - | Extra headers, query params, and body fields for search requests |
+| Attribute            | Type    | Default | Description                                                                       |
+| -------------------- | ------- | ------- | --------------------------------------------------------------------------------- |
+| `max-results`        | number  | `50`    | Maximum number of results to request from the API                                 |
+| `max-render-results` | number  | `10`    | Maximum number of results rendered in the UI (drives the "see more" affordance)   |
+| `debounce-ms`        | number  | `300`   | Input debounce delay in milliseconds                                              |
+| `show-url`           | boolean | `false` | Show URL in search results                                                        |
+| `show-date`          | boolean | `false` | Show result dates when a timestamp is available                                   |
+| `request-options`    | JSON string | -   | Extra headers, query params, and body fields for search requests                  |
 
 ### Modal-Specific Attributes
 
@@ -392,7 +395,8 @@ const searchBar = document.createElement(
   "search-bar-snippet",
 ) as SearchBarSnippet;
 searchBar.setAttribute("api-url", "https://api.example.com");
-searchBar.setAttribute("max-results", "10");
+searchBar.setAttribute("max-results", "50");
+searchBar.setAttribute("max-render-results", "10");
 
 const chatBubble = document.createElement(
   "chat-bubble-snippet",
