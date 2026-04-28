@@ -4,6 +4,7 @@
  */
 
 import type { AISearchClient } from '../api/ai-search.ts';
+import { StatsClient } from '../api/stats.ts';
 import { POWERED_BY_BRANDING } from '../constants.ts';
 import {
   interpolate,
@@ -34,6 +35,7 @@ const DEFAULT_REQUEST_MAX_RESULTS = 50;
 export class SearchBarSnippet extends HTMLElement {
   private shadow: ShadowRoot;
   private client: AISearchClient | null = null;
+  private stats: StatsClient | null = null;
   private container: HTMLElement | null = null;
   private inputElement: HTMLInputElement | null = null;
   private resultsContainer: HTMLElement | null = null;
@@ -45,11 +47,18 @@ export class SearchBarSnippet extends HTMLElement {
   private translationsOverride: Translations | null = null;
   private resolvedTranslations = mergeTranslations(null);
 
+  // Analytics context: captures the most recently completed search so that
+  // click / view-more events report the same query + total.
+  private lastSearchQuery = '';
+  private lastSearchTotal = 0;
+
   // Event handler references for cleanup
   private handleInputChange: ((e: Event) => void) | null = null;
   private handleInputKeydownEnter: ((e: KeyboardEvent) => void) | null = null;
   private handleInputKeydownEscape: ((e: KeyboardEvent) => void) | null = null;
   private handleSearchButtonClick: (() => void) | null = null;
+  private handleResultClick: ((e: Event) => void) | null = null;
+  private handleSeeMoreClick: ((e: Event) => void) | null = null;
 
   static get observedAttributes() {
     return [
@@ -64,6 +73,7 @@ export class SearchBarSnippet extends HTMLElement {
       'show-date',
       'hide-thumbnails',
       'see-more',
+      'disable-analytics',
       'request-options',
       'translations',
     ] as const;
@@ -88,7 +98,7 @@ export class SearchBarSnippet extends HTMLElement {
   attributeChangedCallback(name: string, oldValue: string | null, newValue: string | null): void {
     if (oldValue === newValue) return;
 
-    if (name === 'api-url') {
+    if (name === 'api-url' || name === 'disable-analytics') {
       this.initializeClient();
     } else if (name === 'theme') {
       // Theme changes are handled automatically by CSS :host([theme]) selectors
@@ -169,6 +179,7 @@ export class SearchBarSnippet extends HTMLElement {
       showDate: parseBooleanAttribute(this.getAttribute('show-date'), false),
       hideThumbnails: parseBooleanAttribute(this.getAttribute('hide-thumbnails'), false),
       seeMore: parseAttribute(this.getAttribute('see-more'), ''),
+      disableAnalytics: parseBooleanAttribute(this.getAttribute('disable-analytics'), false),
       translations: this.translationsOverride ?? undefined,
     };
   }
@@ -204,14 +215,26 @@ export class SearchBarSnippet extends HTMLElement {
     if (!props.apiUrl) {
       console.error('SearchBarSnippet: api-url attribute is required');
       this.client = null;
+      this.destroyStatsClient();
       this.showMissingApiUrlError();
       return;
     }
 
     try {
       this.client = createClient(props.apiUrl);
+      this.destroyStatsClient();
+      if (!props.disableAnalytics) {
+        this.stats = new StatsClient(props.apiUrl);
+      }
     } catch (error) {
       console.error('SearchBarSnippet:', error);
+    }
+  }
+
+  private destroyStatsClient(): void {
+    if (this.stats) {
+      this.stats.destroy();
+      this.stats = null;
     }
   }
 
@@ -342,6 +365,9 @@ export class SearchBarSnippet extends HTMLElement {
         request: this.getRequestOptions(),
       });
       const visibleResults = results.slice(0, props.maxRenderResults || DEFAULT_RENDER_RESULTS);
+      this.lastSearchQuery = query;
+      this.lastSearchTotal = results.length;
+      this.stats?.trackSearch(query, results.length);
       this.displayResults(visibleResults, query, results.length);
     } catch (error) {
       // Don't show error state for cancelled requests
@@ -396,7 +422,7 @@ export class SearchBarSnippet extends HTMLElement {
                 ${brandingHTML}
             </div>
             <div class="search-results">
-                ${results.map((result) => this.renderResult(result)).join('')}
+                ${results.map((result, index) => this.renderResult(result, index)).join('')}
             </div>
             ${seeMoreHTML}
         `;
@@ -407,7 +433,7 @@ export class SearchBarSnippet extends HTMLElement {
     this.attachResultHandlers();
   }
 
-  private renderResult(result: SearchResult): string {
+  private renderResult(result: SearchResult, index: number): string {
     const props = this.getProps();
     const imageHTML = props.hideThumbnails
       ? ''
@@ -427,7 +453,7 @@ export class SearchBarSnippet extends HTMLElement {
         : '';
 
     return `
-            <a href="${href}" class="search-result-item" data-result-id="${escapeHTML(result.url || '')}">
+            <a href="${href}" class="search-result-item" data-index="${index}" data-result-id="${escapeHTML(result.id || '')}">
                 ${imageHTML}
                 <div class="search-result-content">
                     <div class="search-result-title">${escapeHTML(result.title || '')}</div>
@@ -464,17 +490,46 @@ export class SearchBarSnippet extends HTMLElement {
   }
 
   private attachResultHandlers(): void {
-    const resultItems = this.container?.querySelectorAll('.search-result-item');
-    if (!resultItems) return;
+    // Remove any handlers attached by a previous render before we re-bind.
+    this.detachResultTrackingHandlers();
 
-    // Handle clicks on results without URLs (prevent default anchor behavior)
-    for (const item of resultItems) {
+    const resultsWrapper = this.resultsContainer;
+    if (!resultsWrapper) return;
+
+    // Delegated click handler: captures both actual URL clicks and `href="#"`
+    // items. Fires a stats "click" event with the position + result id.
+    this.handleResultClick = (e: Event) => {
+      const target = e.target as Element | null;
+      const item = target?.closest('.search-result-item') as HTMLElement | null;
+      if (!item) return;
+
       const href = item.getAttribute('href');
       if (href === '#') {
-        item.addEventListener('click', (e) => {
-          e.preventDefault();
-        });
+        e.preventDefault();
       }
+
+      const indexAttr = item.getAttribute('data-index');
+      const resultId = item.getAttribute('data-result-id') ?? '';
+      const index = indexAttr !== null ? Number.parseInt(indexAttr, 10) : Number.NaN;
+
+      if (!Number.isNaN(index) && resultId) {
+        this.stats?.trackClick(
+          this.lastSearchQuery,
+          this.lastSearchTotal,
+          resultId,
+          index
+        );
+      }
+    };
+    resultsWrapper.addEventListener('click', this.handleResultClick);
+
+    // "See more" link click tracking
+    const seeMoreLink = resultsWrapper.querySelector('.search-see-more');
+    if (seeMoreLink) {
+      this.handleSeeMoreClick = () => {
+        this.stats?.trackViewMore(this.lastSearchQuery, this.lastSearchTotal);
+      };
+      seeMoreLink.addEventListener('click', this.handleSeeMoreClick);
     }
 
     // Image load/error handlers
@@ -496,6 +551,17 @@ export class SearchBarSnippet extends HTMLElement {
         (img as HTMLElement).style.display = 'none';
       });
     });
+  }
+
+  private detachResultTrackingHandlers(): void {
+    const resultsWrapper = this.resultsContainer;
+    if (resultsWrapper && this.handleResultClick) {
+      resultsWrapper.removeEventListener('click', this.handleResultClick);
+    }
+    this.handleResultClick = null;
+
+    // The see-more link is a throw-away element; we only need to drop our ref.
+    this.handleSeeMoreClick = null;
   }
 
   private showLoadingState(): void {
@@ -620,6 +686,9 @@ export class SearchBarSnippet extends HTMLElement {
       this.client.cancelAllRequests();
     }
 
+    // Flush remaining analytics and remove unload listeners
+    this.destroyStatsClient();
+
     // Remove event listeners
     if (this.inputElement) {
       if (this.handleInputChange) {
@@ -636,6 +705,8 @@ export class SearchBarSnippet extends HTMLElement {
     if (this.searchButton && this.handleSearchButtonClick) {
       this.searchButton.removeEventListener('click', this.handleSearchButtonClick);
     }
+
+    this.detachResultTrackingHandlers();
 
     // Clear handler references
     this.handleInputChange = null;
