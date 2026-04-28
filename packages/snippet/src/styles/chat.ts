@@ -45,6 +45,7 @@ export const chatStyles = `
   gap: var(--search-snippet-spacing-sm);
   max-width: 85%;
   animation: slideIn var(--search-snippet-animation-duration) ease-out;
+  animation-fill-mode: both;
 }
 
 @keyframes slideIn {
@@ -115,6 +116,9 @@ export const chatStyles = `
   border-radius: var(--search-snippet-border-radius);
   word-wrap: break-word;
   overflow-wrap: break-word;
+  /* Isolate layout cost of bubble height changes during streaming so
+     siblings don't reflow. */
+  contain: layout style;
 }
 
 .chat-message-user .chat-message-bubble {

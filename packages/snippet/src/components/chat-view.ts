@@ -21,6 +21,13 @@ export interface Message {
   timestamp: number;
   metadata?: Record<string, unknown>;
 }
+/**
+ * Pixel threshold below which we consider the user to still be reading the
+ * latest message and auto-follow the stream. If they've scrolled further up,
+ * we leave them alone.
+ */
+const BOTTOM_FOLLOW_THRESHOLD_PX = 64;
+
 export class ChatView {
   private container: HTMLElement;
   private client: AISearchClient;
@@ -34,6 +41,7 @@ export class ChatView {
   private currentStreamingMessageId: string | null = null;
   private loadingMessageInterval: ReturnType<typeof setInterval> | null = null;
   private loadingMessageIndex = 0;
+  private pendingScrollFrame: number | null = null;
 
   // Event handler references for cleanup
   private handleInputResize: ((e: Event) => void) | null = null;
@@ -231,14 +239,77 @@ export class ChatView {
   }
 
   /**
-   * Update streaming message content
+   * Update streaming message content.
+   *
+   * During streaming this performs a surgical DOM update on the streaming
+   * bubble only — no full message-list re-render. Content is written as plain
+   * text (escaped via textContent) to avoid markdown structural flips that
+   * cause height jumps. Markdown is applied once the stream completes via the
+   * final `renderMessages()` call in `sendMessage`'s `finally` block.
    */
   private updateStreamingMessage(messageId: string, content: string): void {
     const messageIndex = this.messages.findIndex((m) => m.id === messageId);
-    if (messageIndex !== -1) {
-      this.messages[messageIndex].content = content;
+    if (messageIndex === -1) {
+      return;
+    }
+    this.messages[messageIndex].content = content;
+
+    if (!this.updateStreamingMessageDOM(messageId, content)) {
+      // Fallback: if the bubble can't be located (e.g. immediately after a
+      // setProps re-render), do a full render so the UI never stays stale.
       this.renderMessages(true);
     }
+  }
+
+  /**
+   * Surgically update the streaming bubble's text node. Returns true on
+   * success, false if the target nodes weren't found (caller should fall back
+   * to a full re-render).
+   */
+  private updateStreamingMessageDOM(messageId: string, content: string): boolean {
+    if (!this.messagesContainer) {
+      return false;
+    }
+
+    const messageRoot = this.messagesContainer.querySelector(
+      `[data-message-id="${CSS.escape(messageId)}"]`
+    );
+    if (!messageRoot) {
+      return false;
+    }
+
+    const bubble = messageRoot.querySelector('.chat-message-bubble');
+    if (!bubble) {
+      return false;
+    }
+
+    // Capture scroll position BEFORE mutating the DOM so the smart-follow
+    // decision is based on where the user actually is right now.
+    const wasNearBottom = this.isNearBottom();
+
+    let textNode = bubble.querySelector('.chat-message-text');
+    if (!textNode) {
+      // Bubble was rendered with empty content; insert the text node now,
+      // before the streaming dots indicator if present.
+      const created = document.createElement('div');
+      created.className = 'chat-message-text';
+      const streamingIndicator = bubble.querySelector('.chat-streaming');
+      if (streamingIndicator) {
+        bubble.insertBefore(created, streamingIndicator);
+      } else {
+        bubble.appendChild(created);
+      }
+      textNode = created;
+    }
+
+    // Plain-text update during streaming. textContent escapes safely and is
+    // significantly cheaper than reparsing markdown into innerHTML each token.
+    textNode.textContent = content;
+
+    if (wasNearBottom) {
+      this.scheduleScrollToBottom();
+    }
+    return true;
   }
 
   /**
@@ -253,7 +324,9 @@ export class ChatView {
   }
 
   /**
-   * Render all messages
+   * Render all messages. Forces a scroll to bottom regardless of current
+   * scroll position; called only on full-list mutations (add, clear, set,
+   * end-of-stream final render, prop changes), not on per-token updates.
    */
   private renderMessages(isStreaming = false): void {
     if (!this.messagesContainer) return;
@@ -271,8 +344,8 @@ export class ChatView {
 
     this.messagesContainer.innerHTML = messagesHTML;
 
-    // Scroll to bottom
-    this.scrollToBottom();
+    // Force scroll on full re-renders (new turn, clear, set, end-of-stream).
+    this.scheduleScrollToBottom();
   }
 
   /**
@@ -283,13 +356,21 @@ export class ChatView {
     const roleClass = `chat-message-${message.role}`;
     const avatar = message.role === 'user' ? t.userAvatar : t.assistantAvatar;
     const loadingMessage = t.loadingMessages[this.loadingMessageIndex] ?? '';
+    // While streaming, show the in-progress text as plain (escaped) text to
+    // avoid markdown structural flips that cause bubble-height jumps. The
+    // final render after stream completion applies markdown.
+    const renderedContent = message.content
+      ? isStreaming
+        ? escapeHTML(message.content)
+        : markdownToHtml(message.content)
+      : '';
 
     return `
-      <div class="chat-message ${roleClass}">
+      <div class="chat-message ${roleClass}" data-message-id="${escapeHTML(message.id)}">
         <div class="chat-message-avatar">${escapeHTML(avatar)}</div>
         <div class="chat-message-content">
           <div class="chat-message-bubble">
-            ${message.content ? `<div class="chat-message-text">${markdownToHtml(message.content)}</div>` : ''}
+            ${renderedContent ? `<div class="chat-message-text">${renderedContent}</div>` : ''}
             ${isStreaming ? `<div class="chat-streaming"><span class="chat-streaming-dot"></span><span class="chat-streaming-dot"></span><span class="chat-streaming-dot"></span><span class="loading-text">${escapeHTML(loadingMessage)}</span></div>` : ''}
           </div>
           <div class="chat-message-metadata">
@@ -301,15 +382,35 @@ export class ChatView {
   }
 
   /**
-   * Scroll to bottom of messages
+   * True when the user is within `BOTTOM_FOLLOW_THRESHOLD_PX` of the bottom
+   * of the messages list. Used to decide whether to auto-follow the stream
+   * or leave the user where they scrolled.
    */
-  private scrollToBottom(): void {
-    if (!this.messagesContainer) return;
+  private isNearBottom(): boolean {
+    const container = this.messagesContainer;
+    if (!container) return true;
+    return (
+      container.scrollHeight - container.scrollTop - container.clientHeight <
+      BOTTOM_FOLLOW_THRESHOLD_PX
+    );
+  }
 
-    requestAnimationFrame(() => {
-      if (this.messagesContainer) {
-        this.messagesContainer.scrollTop = this.messagesContainer.scrollHeight;
-      }
+  /**
+   * Schedule a single scroll-to-bottom on the next animation frame. Multiple
+   * calls within the same frame are coalesced into one DOM write. The "should
+   * I scroll?" decision is gated by callers — `updateStreamingMessageDOM`
+   * only calls this when the user is near the bottom; full re-renders always
+   * call it.
+   */
+  private scheduleScrollToBottom(): void {
+    if (!this.messagesContainer) return;
+    if (this.pendingScrollFrame !== null) return;
+
+    this.pendingScrollFrame = requestAnimationFrame(() => {
+      this.pendingScrollFrame = null;
+      const container = this.messagesContainer;
+      if (!container) return;
+      container.scrollTop = container.scrollHeight;
     });
   }
 
@@ -346,10 +447,35 @@ export class ChatView {
     this.loadingMessageInterval = setInterval(() => {
       const current = this.translations.loadingMessages;
       this.loadingMessageIndex = (this.loadingMessageIndex + 1) % current.length;
-      if (this.isStreaming) {
+      if (!this.isStreaming) return;
+
+      // Surgically update only the streaming bubble's loading-text span.
+      // Avoids tearing down the full message list (which would restart the
+      // pulse animation on the streaming dots and the slide-in animation on
+      // every prior message).
+      const updated = this.updateLoadingTextDOM(current[this.loadingMessageIndex] ?? '');
+      if (!updated) {
         this.renderMessages(true);
       }
     }, LOADING_MESSAGE_INTERVAL_MS);
+  }
+
+  /**
+   * Update the rotating loading-text label inside the currently-streaming
+   * bubble only. Returns true on success, false if the target wasn't found.
+   */
+  private updateLoadingTextDOM(text: string): boolean {
+    if (!this.messagesContainer || !this.currentStreamingMessageId) {
+      return false;
+    }
+    const bubbleRoot = this.messagesContainer.querySelector(
+      `[data-message-id="${CSS.escape(this.currentStreamingMessageId)}"]`
+    );
+    if (!bubbleRoot) return false;
+    const loadingText = bubbleRoot.querySelector('.chat-streaming .loading-text');
+    if (!loadingText) return false;
+    loadingText.textContent = text;
+    return true;
   }
 
   private clearLoadingMessages(): void {
@@ -425,6 +551,11 @@ export class ChatView {
    */
   public destroy(): void {
     this.clearLoadingMessages();
+
+    if (this.pendingScrollFrame !== null) {
+      cancelAnimationFrame(this.pendingScrollFrame);
+      this.pendingScrollFrame = null;
+    }
 
     if (this.isStreaming) {
       this.client.cancelAllRequests();

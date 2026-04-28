@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
+import type { ChatTypes } from '../types/index.ts';
 import { AISearchClient } from './ai-search.ts';
 
 class MockDOMParser {
@@ -62,6 +63,66 @@ function createSearchStreamResponse(): Response {
       'Content-Type': 'text/event-stream',
     },
   });
+}
+
+function createDeltaFrame(content: string): string {
+  return `data: ${JSON.stringify({
+    id: 'id-1',
+    object: 'chat.completion.chunk',
+    choices: [{ index: 0, delta: { content } }],
+  })}\n\n`;
+}
+
+function createChatStreamResponse(frames: string[]): Response {
+  const stream = new ReadableStream<Uint8Array>({
+    start(controller) {
+      const encoder = new TextEncoder();
+      for (const frame of frames) {
+        controller.enqueue(encoder.encode(frame));
+      }
+      controller.close();
+    },
+  });
+
+  return new Response(stream, {
+    status: 200,
+    headers: {
+      'Content-Type': 'text/event-stream',
+    },
+  });
+}
+
+function createChatStreamResponseChunked(payload: string, chunkSize: number): Response {
+  const encoder = new TextEncoder();
+  const stream = new ReadableStream<Uint8Array>({
+    start(controller) {
+      for (let i = 0; i < payload.length; i += chunkSize) {
+        controller.enqueue(encoder.encode(payload.slice(i, i + chunkSize)));
+      }
+      controller.close();
+    },
+  });
+
+  return new Response(stream, {
+    status: 200,
+    headers: {
+      'Content-Type': 'text/event-stream',
+    },
+  });
+}
+
+function createChatNonStreamResponse(content: string): Response {
+  return new Response(
+    JSON.stringify({
+      choices: [{ message: { content } }],
+    }),
+    {
+      status: 200,
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    }
+  );
 }
 
 describe('AISearchClient request enrichment', () => {
@@ -200,5 +261,185 @@ describe('AISearchClient request enrichment', () => {
     const [url] = fetchMock.mock.calls[0] as [string, RequestInit];
 
     expect(url).toBe('/api/search?locale=en');
+  });
+});
+
+describe('AISearchClient.chat', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  it('streams content deltas as they arrive', async () => {
+    const chunksFrame =
+      'event: chunks\n' +
+      `data: ${JSON.stringify([
+        {
+          id: 'src-1',
+          item: {
+            key: 'https://example.com/a',
+            metadata: { title: 'A', description: 'a' },
+          },
+        },
+      ])}\n\n`;
+
+    const finishFrame = `data: ${JSON.stringify({
+      id: 'id-1',
+      object: 'chat.completion.chunk',
+      choices: [{ index: 0, delta: {}, finish_reason: 'stop' }],
+    })}\n\n`;
+
+    const fetchMock = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(
+        createChatStreamResponse([
+          chunksFrame,
+          createDeltaFrame('Hello'),
+          createDeltaFrame(', '),
+          createDeltaFrame('world!'),
+          finishFrame,
+          'data: [DONE]\n\n',
+        ])
+      );
+
+    const client = new AISearchClient('https://example.com');
+    const yields: ChatTypes[] = [];
+    for await (const chunk of client.chat('hi')) {
+      yields.push(chunk);
+    }
+
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const body = JSON.parse(init.body as string) as Record<string, unknown>;
+    expect(url).toBe('https://example.com/chat/completions');
+    expect(body).toEqual({
+      messages: [{ role: 'user', content: 'hi' }],
+      stream: true,
+    });
+    expect(init.headers).toMatchObject({
+      Accept: 'text/event-stream',
+      'cf-ai-search-source': 'snippet-chat-completions',
+    });
+
+    expect(yields).toEqual([
+      { type: 'text', message: 'Hello' },
+      { type: 'text', message: ', ' },
+      { type: 'text', message: 'world!' },
+    ]);
+  });
+
+  it('reassembles deltas across arbitrary network chunk boundaries', async () => {
+    const payload = [
+      'event: chunks\n',
+      `data: ${JSON.stringify([{ id: 'x' }])}\n\n`,
+      createDeltaFrame('Ol'),
+      createDeltaFrame('á'),
+      createDeltaFrame(' world'),
+      'data: [DONE]\n\n',
+    ].join('');
+
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(createChatStreamResponseChunked(payload, 7));
+
+    const client = new AISearchClient('https://example.com');
+    const collected: string[] = [];
+    for await (const chunk of client.chat('hi')) {
+      if (chunk.type === 'text') {
+        collected.push(chunk.message);
+      }
+    }
+
+    expect(collected.join('')).toBe('Olá world');
+    expect(collected).toEqual(['Ol', 'á', ' world']);
+  });
+
+  it('returns single concatenated yield when stream: false', async () => {
+    const fetchMock = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(createChatNonStreamResponse('full answer'));
+
+    const client = new AISearchClient('https://example.com');
+    const yields: ChatTypes[] = [];
+    for await (const chunk of client.chat('hi', { stream: false })) {
+      yields.push(chunk);
+    }
+
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const body = JSON.parse(init.body as string) as Record<string, unknown>;
+    expect(body).toEqual({
+      messages: [{ role: 'user', content: 'hi' }],
+      stream: false,
+    });
+    expect(init.headers).toMatchObject({
+      Accept: 'application/json',
+    });
+
+    expect(yields).toEqual([{ type: 'text', message: 'full answer' }]);
+  });
+
+  it('skips malformed SSE frames without aborting the stream', async () => {
+    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      createChatStreamResponse([
+        createDeltaFrame('hi'),
+        'data: not-json\n\n',
+        createDeltaFrame(' there'),
+        'data: [DONE]\n\n',
+      ])
+    );
+
+    const client = new AISearchClient('https://example.com');
+    const yields: ChatTypes[] = [];
+    for await (const chunk of client.chat('hi')) {
+      yields.push(chunk);
+    }
+
+    expect(yields).toEqual([
+      { type: 'text', message: 'hi' },
+      { type: 'text', message: ' there' },
+    ]);
+    expect(consoleErrorSpy).toHaveBeenCalled();
+  });
+
+  it('terminates silently when the request is aborted mid-stream', async () => {
+    const controller = new AbortController();
+    const stream = new ReadableStream<Uint8Array>({
+      start(streamController) {
+        const encoder = new TextEncoder();
+        streamController.enqueue(encoder.encode(createDeltaFrame('partial')));
+      },
+      pull() {
+        return new Promise<void>((_, reject) => {
+          controller.signal.addEventListener('abort', () => {
+            const error = new Error('aborted');
+            error.name = 'AbortError';
+            reject(error);
+          });
+        });
+      },
+    });
+
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(stream, {
+        status: 200,
+        headers: { 'Content-Type': 'text/event-stream' },
+      })
+    );
+
+    const client = new AISearchClient('https://example.com');
+    const yields: ChatTypes[] = [];
+    const iterator = client.chat('hi', { signal: controller.signal });
+
+    const first = await iterator.next();
+    if (!first.done) {
+      yields.push(first.value);
+    }
+
+    controller.abort();
+
+    for await (const chunk of iterator) {
+      yields.push(chunk);
+    }
+
+    expect(yields).toEqual([{ type: 'text', message: 'partial' }]);
   });
 });

@@ -18,6 +18,51 @@ import { decodeHTMLEntities } from '../utils/index.ts';
 
 type RequestOperation = 'ai-search' | 'search' | 'chat/completions';
 
+interface ParsedSSEEvent {
+  event: string;
+  data: string;
+}
+
+/**
+ * Parse a single SSE event block (text between blank lines) into its event
+ * name and concatenated data payload. Returns null when the block carries no
+ * data field. Implements the subset of the SSE spec we need: comment lines,
+ * `event:` and `data:` fields, optional single leading space stripping, and
+ * multi-line data joined with newlines.
+ */
+function parseSSEEvent(block: string): ParsedSSEEvent | null {
+  let event = 'message';
+  const dataLines: string[] = [];
+
+  for (const rawLine of block.split('\n')) {
+    // Tolerate CRLF line endings.
+    const line = rawLine.endsWith('\r') ? rawLine.slice(0, -1) : rawLine;
+
+    if (line === '' || line.startsWith(':')) {
+      continue;
+    }
+
+    const colonIndex = line.indexOf(':');
+    const field = colonIndex === -1 ? line : line.slice(0, colonIndex);
+    let value = colonIndex === -1 ? '' : line.slice(colonIndex + 1);
+    if (value.startsWith(' ')) {
+      value = value.slice(1);
+    }
+
+    if (field === 'event') {
+      event = value;
+    } else if (field === 'data') {
+      dataLines.push(value);
+    }
+  }
+
+  if (dataLines.length === 0) {
+    return null;
+  }
+
+  return { event, data: dataLines.join('\n') };
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
@@ -265,49 +310,122 @@ export class AISearchClient {
   async *chat(query: string, options?: ChatOptions): AsyncGenerator<ChatTypes, void, undefined> {
     const controller = new AbortController();
     const signal = options?.signal || controller.signal;
-    // const prevQueries: string[] = JSON.parse(localStorage.getItem('prevQueries') || '[]');
-    // prevQueries.push(query);
-    // localStorage.setItem('prevQueries', JSON.stringify(prevQueries));
+    const stream = options?.stream ?? true;
+
     const response = await this.request(
       {
         messages: [{ role: 'user', content: query }],
-        stream: false,
+        stream,
       },
       'chat/completions',
       signal
     );
+
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
     }
     if (!response.body) {
       throw new Error('Response body is empty');
     }
-    const result = (await response.json()) as {
-      choices: {
-        message: {
-          content: string;
+
+    if (!stream) {
+      const result = (await response.json()) as {
+        choices: { message: { content: string } }[];
+      };
+
+      yield {
+        type: 'text',
+        message: result.choices.map((choice) => choice.message.content).join(''),
+      } satisfies ChatTextResponse;
+
+      return;
+    }
+
+    yield* this.parseChatStream(response.body);
+  }
+
+  /**
+   * Consume an SSE stream from the chat/completions endpoint and yield one
+   * ChatTextResponse per non-empty content delta. Discards `event: chunks`
+   * (RAG sources) and the `[DONE]` sentinel; tolerates malformed individual
+   * frames without aborting the whole stream.
+   */
+  private async *parseChatStream(
+    body: ReadableStream<Uint8Array>
+  ): AsyncGenerator<ChatTypes, void, undefined> {
+    const reader = body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    const consumeEvent = (block: string): ChatTextResponse | 'done' | null => {
+      const parsed = parseSSEEvent(block);
+      if (!parsed) {
+        return null;
+      }
+
+      if (parsed.event === 'chunks') {
+        // RAG source documents - discard for now.
+        return null;
+      }
+
+      if (parsed.data === '[DONE]') {
+        return 'done';
+      }
+
+      try {
+        const chunk = JSON.parse(parsed.data) as {
+          choices?: Array<{ delta?: { content?: string } }>;
         };
-      }[];
+        const content = chunk.choices?.[0]?.delta?.content;
+        if (typeof content === 'string' && content.length > 0) {
+          return { type: 'text', message: content } satisfies ChatTextResponse;
+        }
+      } catch (error) {
+        console.error('AISearchClient: failed to parse SSE chat chunk', error);
+      }
+
+      return null;
     };
 
-    yield {
-      type: 'text',
-      message: result.choices.map((choice) => choice.message.content).join(''),
-    } satisfies ChatTextResponse;
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) {
+          break;
+        }
+        buffer += decoder.decode(value, { stream: true });
 
-    // for (const item of result.data) {
-    //   yield {
-    //     type: 'result',
-    //     id: item.filename,
-    //     title: item.filename,
-    //     description: item.content.text,
-    //     url: item.filename,
-    //     metadata: item.attributes
-    //     ,
-    //   } satisfies ChatResult;
-    // }
+        let boundaryIndex = buffer.indexOf('\n\n');
+        while (boundaryIndex !== -1) {
+          const block = buffer.slice(0, boundaryIndex);
+          buffer = buffer.slice(boundaryIndex + 2);
+          const result = consumeEvent(block);
+          if (result === 'done') {
+            return;
+          }
+          if (result) {
+            yield result;
+          }
+          boundaryIndex = buffer.indexOf('\n\n');
+        }
+      }
 
-    return;
+      // Flush any trailing event that wasn't terminated by a blank line.
+      buffer += decoder.decode();
+      if (buffer.trim().length > 0) {
+        const result = consumeEvent(buffer);
+        if (result && result !== 'done') {
+          yield result;
+        }
+      }
+    } catch (error) {
+      if ((error as Error).name === 'AbortError') {
+        return;
+      }
+      throw error;
+    } finally {
+      reader.releaseLock();
+    }
   }
 
   /**
