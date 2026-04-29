@@ -147,8 +147,22 @@ export const API_REFERENCE_SECTIONS: readonly ReferenceSectionData[] = [
   {
     id: 'props-chat-bubble',
     title: '<chat-bubble-snippet> Props',
-    description: 'Uses common props only (api-url, placeholder, theme, hide-branding).',
+    description:
+      'Uses the common props (api-url, placeholder, theme, hide-branding) plus the chat-only attributes below.',
     tables: [
+      {
+        columns: ['Attribute', 'Type', 'Default', 'Description'],
+        codeColumns: [0],
+        defaultColumns: [2],
+        rows: [
+          [
+            'chat-query-rewrite',
+            'JSON string',
+            '-',
+            'Configure AI Search query rewriting on subsequent chat turns. See the Chat Query Rewrite section below.',
+          ],
+        ],
+      },
       {
         title: 'Methods',
         columns: ['Method', 'Parameters', 'Returns', 'Description'],
@@ -171,8 +185,21 @@ export const API_REFERENCE_SECTIONS: readonly ReferenceSectionData[] = [
     id: 'props-chat-page',
     title: '<chat-page-snippet> Props',
     description:
-      'Uses common props only (api-url, placeholder, theme, hide-branding). Includes session history with localStorage persistence.',
+      'Uses the common props (api-url, placeholder, theme, hide-branding) plus the chat-only attributes below. Includes session history with localStorage persistence.',
     tables: [
+      {
+        columns: ['Attribute', 'Type', 'Default', 'Description'],
+        codeColumns: [0],
+        defaultColumns: [2],
+        rows: [
+          [
+            'chat-query-rewrite',
+            'JSON string',
+            '-',
+            'Configure AI Search query rewriting on subsequent chat turns. See the Chat Query Rewrite section below.',
+          ],
+        ],
+      },
       {
         title: 'Methods',
         columns: ['Method', 'Parameters', 'Returns', 'Description'],
@@ -225,6 +252,58 @@ export const API_REFERENCE_SECTIONS: readonly ReferenceSectionData[] = [
     ],
   },
   {
+    id: 'chat-query-rewrite',
+    title: 'Chat Query Rewrite',
+    description:
+      'Multi-turn chat sends the full conversation to the API so AI Search can rewrite the latest user message into a self-contained retrieval query. Rewriting is automatic from the second user message onward — the first message has no history to rewrite against. Configure via the `chat-query-rewrite` attribute (or `chatQueryRewrite` JS property) on `<chat-bubble-snippet>` and `<chat-page-snippet>`.',
+    tables: [
+      {
+        title: 'Configuration keys',
+        columns: ['Key', 'Type', 'Default', 'Description'],
+        codeColumns: [0],
+        defaultColumns: [2],
+        rows: [
+          [
+            'enabled',
+            'boolean',
+            'true (on subsequent turns)',
+            'Set to `false` to disable query rewriting entirely. `true` keeps the default behavior — first turn always sends without rewriting.',
+          ],
+          [
+            'model',
+            'string',
+            '"@cf/meta/llama-3.3-70b-instruct-fp8-fast"',
+            'Model used by AI Search to rewrite the conversation into a search query. Accepts any model id supported by the AI Search query_rewrite option.',
+          ],
+          [
+            'rewritePrompt',
+            'string',
+            'Built-in prompt',
+            'System prompt sent to the rewriter as `rewrite_prompt`. The default instructs the model to resolve coreferences from prior turns and emit a single standalone query.',
+          ],
+        ],
+      },
+      {
+        title: 'Wire format',
+        columns: ['Behavior', 'Details'],
+        rows: [
+          [
+            'Request body',
+            'Subsequent chat requests include the full prior `messages` (user + assistant turns) plus the new user message, and `ai_search_options.query_rewrite: { enabled, model, rewrite_prompt }`.',
+          ],
+          [
+            'First turn',
+            'Sends just the new user message with no `ai_search_options` block, regardless of `enabled`.',
+          ],
+          [
+            'Disabling',
+            'Pass `{"enabled": false}` to skip rewriting on every turn — history is still forwarded, but the request omits `ai_search_options.query_rewrite`.',
+          ],
+        ],
+      },
+    ],
+  },
+  {
     id: 'api-client',
     title: 'AISearchClient',
     tables: [
@@ -248,9 +327,9 @@ export const API_REFERENCE_SECTIONS: readonly ReferenceSectionData[] = [
           ],
           [
             'chat(query, options?)',
-            'query: string, options?: { signal? }',
+            'query: string, options?: { stream?, signal?, history?, queryRewrite? }',
             'AsyncGenerator<ChatTypes>',
-            'Perform a chat completion request',
+            'Perform a chat completion request. Pass `history` to forward prior turns and `queryRewrite: true` (or an override object) to enable AI Search query rewriting.',
           ],
         ],
       },

@@ -4,6 +4,7 @@
 
 import { AISearchClient } from '../api/ai-search.ts';
 import { interpolate, mergeTranslations, type Translations } from '../i18n/index.ts';
+import type { SearchSnippetProps } from '../types/index.ts';
 
 export { LOADING_MESSAGE_INTERVAL_MS, LOADING_MESSAGES } from './loading-messages.ts';
 
@@ -140,6 +141,46 @@ export function parseNumberAttribute(value: string | null, defaultValue: number)
   if (value === null) return defaultValue;
   const parsed = Number.parseInt(value, 10);
   return Number.isNaN(parsed) ? defaultValue : parsed;
+}
+
+/**
+ * Parse the `chat-query-rewrite` attribute payload (a JSON object) into a
+ * `SearchSnippetProps['chatQueryRewrite']`. Returns `undefined` when the
+ * attribute is absent or invalid; logs a warning on invalid JSON or on
+ * unknown shapes so misconfigurations surface during development.
+ */
+export function parseChatQueryRewriteAttribute(
+  value: string | null,
+  componentName: string
+): SearchSnippetProps['chatQueryRewrite'] {
+  if (value === null || value === '') {
+    return undefined;
+  }
+
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      throw new Error('chat-query-rewrite must be a JSON object');
+    }
+
+    const candidate = parsed as Record<string, unknown>;
+    const result: SearchSnippetProps['chatQueryRewrite'] = {};
+
+    if (typeof candidate.enabled === 'boolean') {
+      result.enabled = candidate.enabled;
+    }
+    if (typeof candidate.model === 'string') {
+      result.model = candidate.model;
+    }
+    if (typeof candidate.rewritePrompt === 'string') {
+      result.rewritePrompt = candidate.rewritePrompt;
+    }
+
+    return result;
+  } catch (error) {
+    console.error(`${componentName}: invalid chat-query-rewrite attribute`, error);
+    return undefined;
+  }
 }
 
 /**

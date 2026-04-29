@@ -5,7 +5,7 @@
 
 import type { AISearchClient } from '../api/ai-search.ts';
 import { mergeTranslations } from '../i18n/index.ts';
-import type { SearchSnippetProps } from '../types/index.ts';
+import type { ChatMessage, ChatOptions, SearchSnippetProps } from '../types/index.ts';
 import {
   createCustomEvent,
   escapeHTML,
@@ -156,6 +156,15 @@ export class ChatView {
    * Send a message
    */
   public async sendMessage(content: string): Promise<void> {
+    // Snapshot prior conversation BEFORE pushing the new user / placeholder
+    // messages so query rewriting and history forwarding only see completed
+    // turns.
+    const history: ChatMessage[] = this.messages.map((m) => ({
+      role: m.role,
+      content: m.content,
+    }));
+    const queryRewrite = this.resolveQueryRewriteOption(history);
+
     // Add user message
     const userMessage: Message = {
       id: generateId('msg'),
@@ -183,7 +192,7 @@ export class ChatView {
 
     try {
       // Stream the response
-      const stream = this.client.chat(content);
+      const stream = this.client.chat(content, { history, queryRewrite });
 
       let fullContent = '';
 
@@ -228,6 +237,26 @@ export class ChatView {
       this.renderMessages();
       this.currentStreamingMessageId = null;
     }
+  }
+
+  /**
+   * Resolve `chatQueryRewrite` from props into the value passed to
+   * `AISearchClient.chat`. Query rewriting is gated on having at least one
+   * prior turn — there is nothing to rewrite against on the first message.
+   * `chatQueryRewrite.enabled === false` opts out unconditionally.
+   */
+  private resolveQueryRewriteOption(history: ChatMessage[]): ChatOptions['queryRewrite'] {
+    const cfg = this.props.chatQueryRewrite;
+    if (cfg?.enabled === false) {
+      return false;
+    }
+    if (history.length === 0) {
+      return false;
+    }
+    if (cfg && (cfg.model !== undefined || cfg.rewritePrompt !== undefined)) {
+      return { model: cfg.model, rewritePrompt: cfg.rewritePrompt };
+    }
+    return true;
   }
 
   /**

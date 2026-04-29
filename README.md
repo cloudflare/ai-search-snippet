@@ -145,6 +145,43 @@ The JSON object supports:
 Core request fields still win over conflicts: `messages`, `stream`, `max_num_results`, and the
 default `ai_search_options.retrieval.metadata_only` search behavior.
 
+### Chat Query Rewrite
+
+`<chat-bubble-snippet>` and `<chat-page-snippet>` automatically forward the full conversation
+history on every chat request. Starting from the **second** user message in a session, the
+client also enables AI Search's [`query_rewrite`](https://developers.cloudflare.com/api/resources/ai_search/subresources/namespaces/methods/search/)
+option so the latest user message is rewritten into a self-contained retrieval query using the
+prior turns. The first message is sent as-is — there is no history to rewrite against yet.
+
+Configure or disable rewriting via the `chat-query-rewrite` attribute (a JSON object) or the
+matching `chatQueryRewrite` JS property:
+
+```html
+<!-- Disable rewriting entirely -->
+<chat-bubble-snippet
+  api-url="https://api.example.com"
+  chat-query-rewrite='{"enabled": false}'
+></chat-bubble-snippet>
+
+<!-- Override the model -->
+<chat-page-snippet
+  api-url="https://api.example.com"
+  chat-query-rewrite='{"model": "openai/gpt-5-mini"}'
+></chat-page-snippet>
+
+<!-- Override the rewrite prompt -->
+<chat-bubble-snippet
+  api-url="https://api.example.com"
+  chat-query-rewrite='{"rewritePrompt": "Rewrite the latest user message into a single search query, resolving any references using the prior conversation."}'
+></chat-bubble-snippet>
+```
+
+| Key             | Type    | Default                                       | Description                                                                                                          |
+| --------------- | ------- | --------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| `enabled`       | boolean | `true` (on subsequent turns)                  | Set to `false` to skip rewriting on every turn. The first turn never rewrites regardless of this value.              |
+| `model`         | string  | `"@cf/meta/llama-3.3-70b-instruct-fp8-fast"` | Model used by AI Search to rewrite the conversation into a search query.                                             |
+| `rewritePrompt` | string  | Built-in prompt                               | System prompt sent as `rewrite_prompt`. Defaults to a built-in instruction that resolves coreferences and emits a single standalone query. |
+
 ### JavaScript API
 
 #### Search Bar (`<search-bar-snippet>`)

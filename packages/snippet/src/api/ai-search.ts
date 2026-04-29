@@ -18,6 +18,24 @@ import { decodeHTMLEntities } from '../utils/index.ts';
 
 type RequestOperation = 'ai-search' | 'search' | 'chat/completions';
 
+const DEFAULT_QUERY_REWRITE_MODEL = '@cf/meta/llama-3.3-70b-instruct-fp8-fast';
+
+const DEFAULT_QUERY_REWRITE_PROMPT = `You rewrite a multi-turn chat into a single standalone search query for a retrieval system.
+
+Inputs: the full conversation in \`messages\`. The final user message is the one to answer; earlier messages are context only.
+
+Rules:
+- Output ONLY the rewritten query as plain text. No preamble, no quotes, no markdown, no explanation.
+- Resolve pronouns and references (it, that, they, the second one, the previous one, etc.) using prior turns.
+- Inline any entities, names, versions, products, or constraints from earlier turns that the final message depends on.
+- Preserve the user's original language and terminology. Do not translate.
+- Do not invent facts, sources, dates, or details not present in the conversation.
+- If the final user message is already fully self-contained, return it unchanged (modulo trivial cleanup).
+- Drop greetings, thanks, and meta questions about the assistant itself; keep only the information need.
+- Keep it concise — a search query, not a sentence. Aim for under 200 characters when possible.
+
+Return only the rewritten query.`;
+
 interface ParsedSSEEvent {
   event: string;
   data: string;
@@ -312,14 +330,22 @@ export class AISearchClient {
     const signal = options?.signal || controller.signal;
     const stream = options?.stream ?? true;
 
-    const response = await this.request(
-      {
-        messages: [{ role: 'user', content: query }],
-        stream,
-      },
-      'chat/completions',
-      signal
-    );
+    const messages = [...(options?.history ?? []), { role: 'user' as const, content: query }];
+
+    const body: Record<string, unknown> = { messages, stream };
+
+    if (options?.queryRewrite) {
+      const overrides = typeof options.queryRewrite === 'object' ? options.queryRewrite : {};
+      body.ai_search_options = {
+        query_rewrite: {
+          enabled: true,
+          model: overrides.model ?? DEFAULT_QUERY_REWRITE_MODEL,
+          rewrite_prompt: overrides.rewritePrompt ?? DEFAULT_QUERY_REWRITE_PROMPT,
+        },
+      };
+    }
+
+    const response = await this.request(body, 'chat/completions', signal);
 
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);

@@ -400,6 +400,90 @@ describe('AISearchClient.chat', () => {
     expect(consoleErrorSpy).toHaveBeenCalled();
   });
 
+  it('omits ai_search_options on a first-turn chat request', async () => {
+    const fetchMock = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(createChatNonStreamResponse('ok'));
+
+    const client = new AISearchClient('https://example.com');
+    for await (const _ of client.chat('hi', { stream: false })) {
+      // drain
+    }
+
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const body = JSON.parse(init.body as string) as Record<string, unknown>;
+
+    expect(body).toEqual({
+      messages: [{ role: 'user', content: 'hi' }],
+      stream: false,
+    });
+    expect(body).not.toHaveProperty('ai_search_options');
+  });
+
+  it('forwards history and enables query_rewrite with defaults on subsequent turns', async () => {
+    const fetchMock = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(createChatNonStreamResponse('ok'));
+
+    const client = new AISearchClient('https://example.com');
+    for await (const _ of client.chat('and the second one?', {
+      stream: false,
+      history: [
+        { role: 'user', content: 'list cloudflare products' },
+        { role: 'assistant', content: 'Workers, R2, D1, ...' },
+      ],
+      queryRewrite: true,
+    })) {
+      // drain
+    }
+
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const body = JSON.parse(init.body as string) as Record<string, unknown>;
+
+    expect(body.messages).toEqual([
+      { role: 'user', content: 'list cloudflare products' },
+      { role: 'assistant', content: 'Workers, R2, D1, ...' },
+      { role: 'user', content: 'and the second one?' },
+    ]);
+
+    const aiSearchOptions = body.ai_search_options as
+      | { query_rewrite?: { enabled: boolean; model: string; rewrite_prompt: string } }
+      | undefined;
+    expect(aiSearchOptions?.query_rewrite?.enabled).toBe(true);
+    expect(aiSearchOptions?.query_rewrite?.model).toBe('@cf/meta/llama-3.3-70b-instruct-fp8-fast');
+    expect(aiSearchOptions?.query_rewrite?.rewrite_prompt).toContain(
+      'You rewrite a multi-turn chat'
+    );
+  });
+
+  it('honors per-call query_rewrite model and rewritePrompt overrides', async () => {
+    const fetchMock = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(createChatNonStreamResponse('ok'));
+
+    const client = new AISearchClient('https://example.com');
+    for await (const _ of client.chat('follow up', {
+      stream: false,
+      history: [{ role: 'user', content: 'hi' }],
+      queryRewrite: {
+        model: 'openai/gpt-5-mini',
+        rewritePrompt: 'custom rewrite instructions',
+      },
+    })) {
+      // drain
+    }
+
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const body = JSON.parse(init.body as string) as Record<string, unknown>;
+    expect(body.ai_search_options).toEqual({
+      query_rewrite: {
+        enabled: true,
+        model: 'openai/gpt-5-mini',
+        rewrite_prompt: 'custom rewrite instructions',
+      },
+    });
+  });
+
   it('terminates silently when the request is aborted mid-stream', async () => {
     const controller = new AbortController();
     const stream = new ReadableStream<Uint8Array>({

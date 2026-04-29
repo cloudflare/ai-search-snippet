@@ -678,12 +678,7 @@ export class SearchModalSnippet extends HTMLElement {
         const index = indexAttr !== null ? Number.parseInt(indexAttr, 10) : Number.NaN;
 
         if (!Number.isNaN(index) && resultId) {
-          this.stats?.trackClick(
-            this.lastSearchQuery,
-            this.lastSearchTotal,
-            resultId,
-            index
-          );
+          this.stats?.trackClick(this.lastSearchQuery, this.lastSearchTotal, resultId, index);
         }
         return;
       }

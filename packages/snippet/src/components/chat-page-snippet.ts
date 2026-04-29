@@ -15,6 +15,7 @@ import {
   escapeHTML as escapeHTMLUtil,
   parseAttribute,
   parseBooleanAttribute,
+  parseChatQueryRewriteAttribute,
 } from '../utils/index.ts';
 import type { Message } from './chat-view.ts';
 import { ChatView } from './chat-view.ts';
@@ -49,6 +50,8 @@ export class ChatPageSnippet extends HTMLElement {
   private translationsOverride: Translations | null = null;
   private resolvedTranslations = mergeTranslations(null);
 
+  private chatQueryRewriteOverride: SearchSnippetProps['chatQueryRewrite'] | null = null;
+
   // Event handler references for cleanup
   private handleClearClick: (() => void) | null = null;
   private handleNewChatClick: (() => void) | null = null;
@@ -57,7 +60,14 @@ export class ChatPageSnippet extends HTMLElement {
   private handleMessageEvent: (() => void) | null = null;
 
   static get observedAttributes() {
-    return ['api-url', 'placeholder', 'theme', 'hide-branding', 'translations'] as const;
+    return [
+      'api-url',
+      'placeholder',
+      'theme',
+      'hide-branding',
+      'translations',
+      'chat-query-rewrite',
+    ] as const;
   }
 
   constructor() {
@@ -93,6 +103,9 @@ export class ChatPageSnippet extends HTMLElement {
       if (this.isConnected) {
         this.rerenderAfterTranslationsChange();
       }
+    } else if (name === 'chat-query-rewrite') {
+      // No re-render needed: the value is read fresh on each `sendMessage`
+      // via `getProps()`.
     }
   }
 
@@ -101,6 +114,21 @@ export class ChatPageSnippet extends HTMLElement {
    */
   public get translations(): Translations | null {
     return this.translationsOverride;
+  }
+
+  /**
+   * Override AI Search query rewriting on subsequent chat turns. Setting
+   * `null` falls back to parsing the `chat-query-rewrite` attribute.
+   */
+  public get chatQueryRewrite(): SearchSnippetProps['chatQueryRewrite'] | null {
+    return this.chatQueryRewriteOverride;
+  }
+
+  public set chatQueryRewrite(value: SearchSnippetProps['chatQueryRewrite'] | null | undefined) {
+    this.chatQueryRewriteOverride = value ?? null;
+    if (this.chatView) {
+      this.chatView.setProps(this.getProps());
+    }
   }
 
   /**
@@ -194,7 +222,18 @@ export class ChatPageSnippet extends HTMLElement {
       theme: parseAttribute(this.getAttribute('theme'), 'auto') as 'light' | 'dark' | 'auto',
       hideBranding: parseBooleanAttribute(this.getAttribute('hide-branding'), false),
       translations: this.translationsOverride ?? undefined,
+      chatQueryRewrite: this.resolveChatQueryRewrite(),
     };
+  }
+
+  private resolveChatQueryRewrite(): SearchSnippetProps['chatQueryRewrite'] {
+    if (this.chatQueryRewriteOverride !== null) {
+      return this.chatQueryRewriteOverride;
+    }
+    return parseChatQueryRewriteAttribute(
+      this.getAttribute('chat-query-rewrite'),
+      'ChatPageSnippet'
+    );
   }
 
   private initializeClient(): void {

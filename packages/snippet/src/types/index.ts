@@ -46,6 +46,28 @@ export interface SearchSnippetProps {
    * ```
    */
   translations?: Translations;
+  /**
+   * Customize AI Search query rewriting on subsequent chat turns.
+   *
+   * Query rewriting is automatically enabled from the second user message
+   * onward (the first message has no history to rewrite from). Use this to
+   * override the model, the rewrite prompt, or to disable the feature.
+   *
+   * @example
+   * ```ts
+   * element.chatQueryRewrite = { enabled: false };
+   * element.chatQueryRewrite = { model: 'openai/gpt-5-mini' };
+   * element.chatQueryRewrite = { rewritePrompt: 'Rewrite the latest user message...' };
+   * ```
+   */
+  chatQueryRewrite?: {
+    /** Override the auto-enable behavior. Defaults to true on subsequent turns. */
+    enabled?: boolean;
+    /** Override the rewriter model. Defaults to '@cf/meta/llama-3.3-70b-instruct-fp8-fast'. */
+    model?: string;
+    /** Override the system prompt sent as `rewrite_prompt`. Defaults to a built-in prompt. */
+    rewritePrompt?: string;
+  };
 }
 
 /**
@@ -117,11 +139,27 @@ export interface SearchOptions {
 }
 
 /**
+ * A single chat message in the conversation history.
+ */
+export interface ChatMessage {
+  role: 'user' | 'assistant' | 'system';
+  content: string;
+}
+
+/**
  * Chat options
  */
 export interface ChatOptions {
   stream?: boolean;
   signal?: AbortSignal;
+  /** Prior conversation turns to send before the new user query. */
+  history?: ChatMessage[];
+  /**
+   * Enable AI Search query rewriting. Pass `true` to use built-in defaults,
+   * an object to override the model and/or rewrite prompt, or omit / pass
+   * `false` to disable.
+   */
+  queryRewrite?: boolean | { model?: string; rewritePrompt?: string };
 }
 
 /**
