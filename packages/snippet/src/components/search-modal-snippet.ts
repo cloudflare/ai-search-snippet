@@ -5,6 +5,7 @@
  */
 
 import type { AISearchClient } from '../api/ai-search.ts';
+import { StatsClient } from '../api/stats.ts';
 import { POWERED_BY_BRANDING } from '../constants.ts';
 import {
   interpolate,
@@ -42,6 +43,7 @@ export interface SearchModalProps extends SearchSnippetProps {
 export class SearchModalSnippet extends HTMLElement {
   private shadow: ShadowRoot;
   private client: AISearchClient | null = null;
+  private stats: StatsClient | null = null;
   private backdrop: HTMLElement | null = null;
   private modal: HTMLElement | null = null;
   private inputElement: HTMLInputElement | null = null;
@@ -57,11 +59,17 @@ export class SearchModalSnippet extends HTMLElement {
   private translationsOverride: Translations | null = null;
   private resolvedTranslations = mergeTranslations(null);
 
+  // Analytics context: populated by performSearch so click/view-more events
+  // can reuse the query and total from the most recent result set.
+  private lastSearchQuery = '';
+  private lastSearchTotal = 0;
+
   // Event handler references for cleanup
   private handleGlobalKeydown: ((e: KeyboardEvent) => void) | null = null;
   private handleInputChange: ((e: Event) => void) | null = null;
   private handleInputKeydown: ((e: KeyboardEvent) => void) | null = null;
   private handleBackdropClick: ((e: MouseEvent) => void) | null = null;
+  private handleResultsContainerClick: ((e: Event) => void) | null = null;
 
   // Scroll lock state
   private savedBodyStyles: {
@@ -88,6 +96,7 @@ export class SearchModalSnippet extends HTMLElement {
       'show-date',
       'hide-thumbnails',
       'see-more',
+      'disable-analytics',
       'request-options',
       'translations',
     ] as const;
@@ -113,7 +122,7 @@ export class SearchModalSnippet extends HTMLElement {
   attributeChangedCallback(name: string, oldValue: string | null, newValue: string | null): void {
     if (oldValue === newValue) return;
 
-    if (name === 'api-url') {
+    if (name === 'api-url' || name === 'disable-analytics') {
       this.initializeClient();
     } else if (name === 'theme') {
       this.updateTheme(newValue);
@@ -209,6 +218,7 @@ export class SearchModalSnippet extends HTMLElement {
       showDate: parseBooleanAttribute(this.getAttribute('show-date'), false),
       hideThumbnails: parseBooleanAttribute(this.getAttribute('hide-thumbnails'), false),
       seeMore: parseAttribute(this.getAttribute('see-more'), ''),
+      disableAnalytics: parseBooleanAttribute(this.getAttribute('disable-analytics'), false),
       translations: this.translationsOverride ?? undefined,
     };
   }
@@ -244,14 +254,26 @@ export class SearchModalSnippet extends HTMLElement {
     if (!props.apiUrl) {
       console.error('SearchModalSnippet: api-url attribute is required');
       this.client = null;
+      this.destroyStatsClient();
       this.showMissingApiUrlError();
       return;
     }
 
     try {
       this.client = createClient(props.apiUrl);
+      this.destroyStatsClient();
+      if (!props.disableAnalytics) {
+        this.stats = new StatsClient(props.apiUrl);
+      }
     } catch (error) {
       console.error('SearchModalSnippet:', error);
+    }
+  }
+
+  private destroyStatsClient(): void {
+    if (this.stats) {
+      this.stats.destroy();
+      this.stats = null;
     }
   }
 
@@ -502,6 +524,9 @@ export class SearchModalSnippet extends HTMLElement {
       });
       this.results = results.slice(0, props.maxRenderResults || DEFAULT_RENDER_RESULTS);
       this.activeIndex = this.results.length > 0 ? 0 : -1;
+      this.lastSearchQuery = query;
+      this.lastSearchTotal = results.length;
+      this.stats?.trackSearch(query, results.length);
       this.displayResults(this.results, query, results.length);
     } catch (error) {
       // Don't show error state for cancelled requests
@@ -591,6 +616,7 @@ export class SearchModalSnippet extends HTMLElement {
         aria-selected="${index === this.activeIndex}"
         tabindex="-1"
         data-index="${index}"
+        data-result-id="${escapeHTML(result.id || '')}"
         data-url="${escapeHTML(result.url || '')}"
       >
         ${imageHTML}
@@ -629,18 +655,48 @@ export class SearchModalSnippet extends HTMLElement {
   }
 
   private attachResultHandlers(): void {
-    const items = this.resultsContainer?.querySelectorAll('.modal-result-item');
-    if (!items) return;
+    this.detachResultsContainerClick();
 
-    items.forEach((item, index) => {
-      // Handle clicks on results without URLs (prevent default anchor behavior)
-      const href = item.getAttribute('href');
-      if (href === '#') {
-        item.addEventListener('click', (e) => {
+    const resultsWrapper = this.resultsContainer;
+    if (!resultsWrapper) return;
+
+    // Single delegated click listener covers both result items (including
+    // keyboard-triggered clicks via `selectActiveResult`) and the see-more link.
+    this.handleResultsContainerClick = (e: Event) => {
+      const target = e.target as Element | null;
+      if (!target) return;
+
+      const item = target.closest('.modal-result-item') as HTMLElement | null;
+      if (item) {
+        const href = item.getAttribute('href');
+        if (href === '#') {
           e.preventDefault();
-        });
+        }
+
+        const indexAttr = item.getAttribute('data-index');
+        const resultId = item.getAttribute('data-result-id') ?? '';
+        const index = indexAttr !== null ? Number.parseInt(indexAttr, 10) : Number.NaN;
+
+        if (!Number.isNaN(index) && resultId) {
+          this.stats?.trackClick(
+            this.lastSearchQuery,
+            this.lastSearchTotal,
+            resultId,
+            index
+          );
+        }
+        return;
       }
 
+      const seeMore = target.closest('.modal-see-more');
+      if (seeMore) {
+        this.stats?.trackViewMore(this.lastSearchQuery, this.lastSearchTotal);
+      }
+    };
+    resultsWrapper.addEventListener('click', this.handleResultsContainerClick);
+
+    const items = resultsWrapper.querySelectorAll('.modal-result-item');
+    items.forEach((item, index) => {
       item.addEventListener('mouseenter', () => {
         this.activeIndex = index;
         this.updateActiveResult();
@@ -648,8 +704,8 @@ export class SearchModalSnippet extends HTMLElement {
     });
 
     // Image load/error handlers
-    const images = this.resultsContainer?.querySelectorAll('.modal-result-image');
-    images?.forEach((img) => {
+    const images = resultsWrapper.querySelectorAll('.modal-result-image');
+    images.forEach((img) => {
       img.addEventListener('load', () => {
         img.classList.add('loaded');
         const container = img.closest('.modal-result-image-container');
@@ -666,6 +722,13 @@ export class SearchModalSnippet extends HTMLElement {
         (img as HTMLElement).style.display = 'none';
       });
     });
+  }
+
+  private detachResultsContainerClick(): void {
+    if (this.resultsContainer && this.handleResultsContainerClick) {
+      this.resultsContainer.removeEventListener('click', this.handleResultsContainerClick);
+    }
+    this.handleResultsContainerClick = null;
   }
 
   private renderEmptyState(): string {
@@ -870,10 +933,15 @@ export class SearchModalSnippet extends HTMLElement {
       this.backdrop.removeEventListener('click', this.handleBackdropClick);
     }
 
+    this.detachResultsContainerClick();
+
     // Clear handler references
     this.handleInputChange = null;
     this.handleInputKeydown = null;
     this.handleBackdropClick = null;
+
+    // Flush remaining analytics and remove unload listeners
+    this.destroyStatsClient();
 
     // Cancel any pending requests
     if (this.client) {

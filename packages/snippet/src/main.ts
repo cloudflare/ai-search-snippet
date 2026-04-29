@@ -11,6 +11,14 @@
 
 // Export API client for advanced usage
 export { AISearchClient } from './api/ai-search.ts';
+export { StatsClient } from './api/stats.ts';
+export type {
+  ClickStatsEvent,
+  SearchStatsEvent,
+  StatsClientOptions,
+  StatsEvent,
+  ViewMoreStatsEvent,
+} from './api/stats.ts';
 
 // Export all snippet components
 export { ChatBubbleSnippet } from './components/chat-bubble-snippet.ts';

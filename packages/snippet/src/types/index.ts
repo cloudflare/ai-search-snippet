@@ -33,6 +33,11 @@ export interface SearchSnippetProps {
   /** URL template for "See more" link. The search query is appended URL-encoded. Example: "https://example.com/search?q=" */
   seeMore?: string;
   /**
+   * Disable sending search / click / view-more analytics events to the
+   * `/stats` endpoint. Defaults to `false` (analytics enabled).
+   */
+  disableAnalytics?: boolean;
+  /**
    * Override any user-facing string. Omitted keys fall back to English defaults.
    *
    * @example
