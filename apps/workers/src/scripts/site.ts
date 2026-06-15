@@ -1,11 +1,21 @@
 import { DEMO_API_URL } from '../data/configurator.ts';
+import { validateApiUrlParam } from '../lib/api-url-allowlist.ts';
 import './register-snippets.ts';
 
 type Theme = 'dark' | 'light';
 
 function getQueryParamApiUrl(): string | null {
   const params = new URLSearchParams(window.location.search);
-  return params.get('api-url');
+  const raw = params.get('api-url');
+  if (raw === null) return null;
+  const validated = validateApiUrlParam(raw);
+  if (validated === null) {
+    console.warn(
+      'Site: ignoring untrusted ?api-url= value; expected https://<hash>.search.ai.cloudflare.com'
+    );
+    return null;
+  }
+  return validated;
 }
 
 function copyToClipboard(button: HTMLButtonElement, value: string): void {

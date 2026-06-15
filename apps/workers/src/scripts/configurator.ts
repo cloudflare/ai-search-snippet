@@ -7,6 +7,7 @@ import {
   type ThemeMode,
 } from '../data/configurator.ts';
 import { getSnippetTag, type SnippetId } from '../data/snippets.ts';
+import { validateApiUrlParam } from '../lib/api-url-allowlist.ts';
 import {
   type CodeCssVarData,
   type CodePropData,
@@ -29,7 +30,16 @@ type ConfigCodeTab = 'html' | 'react' | 'vue';
 
 function getApiUrlFromQueryParams(): string | null {
   const params = new URLSearchParams(window.location.search);
-  return params.get('api-url');
+  const raw = params.get('api-url');
+  if (raw === null) return null;
+  const validated = validateApiUrlParam(raw);
+  if (validated === null) {
+    console.warn(
+      'Configurator: ignoring untrusted ?api-url= value; expected https://<hash>.search.ai.cloudflare.com'
+    );
+    return null;
+  }
+  return validated;
 }
 
 function copyToClipboard(button: HTMLButtonElement, value: string): void {
