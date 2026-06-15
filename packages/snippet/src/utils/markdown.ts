@@ -1,3 +1,5 @@
+import { sanitizeUrl } from './url-safety.ts';
+
 /**
  * Converts markdown text to HTML
  * Supports: headers, bold, italic, links, lists, code blocks, inline code, blockquotes, and horizontal rules
@@ -114,11 +116,14 @@ function processInlineMarkdown(text: string): string {
   result = result.replace(/\*(.+?)\*/g, '<em>$1</em>');
   result = result.replace(/_(.+?)_/g, '<em>$1</em>');
 
-  // Links [text](url)
-  result = result.replace(
-    /\[([^\]]+)\]\(([^)]+)\)/g,
-    '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>'
-  );
+  // Links [text](url) — restrict the rendered anchor to an allowlisted
+  // set of URL schemes (http, https, mailto, tel) plus relative URLs.
+  // URLs outside that set collapse the link to its visible text only.
+  result = result.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_match, text: string, rawUrl: string) => {
+    const safeUrl = sanitizeUrl(rawUrl);
+    if (!safeUrl) return text;
+    return `<a href="${safeUrl}" target="_blank" rel="noopener noreferrer">${text}</a>`;
+  });
 
   return result;
 }

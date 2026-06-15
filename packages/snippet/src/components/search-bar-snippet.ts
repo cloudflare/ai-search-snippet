@@ -27,6 +27,7 @@ import {
   parseBooleanAttribute,
   parseNumberAttribute,
 } from '../utils/index.ts';
+import { sanitizeUrl } from '../utils/url-safety.ts';
 
 const COMPONENT_NAME = 'search-bar-snippet';
 const DEFAULT_RENDER_RESULTS = 10;
@@ -438,16 +439,20 @@ export class SearchBarSnippet extends HTMLElement {
     const imageHTML = props.hideThumbnails
       ? ''
       : this.renderResultImage(result.image, result.title);
-    const href = result.url ? escapeHTML(result.url) : '#';
-    const displayUrl = result.url ? escapeHTML(formatDisplayUrl(result.url)) : '';
+    // Restrict result.url to an allowlisted set of URL schemes before
+    // stamping it into the anchor href. The URL originates from the
+    // search API's `chunk.item.key` field and is not a same-origin value.
+    const safeUrl = sanitizeUrl(result.url);
+    const href = safeUrl ? escapeHTML(safeUrl) : '#';
+    const displayUrl = safeUrl ? escapeHTML(formatDisplayUrl(safeUrl)) : '';
     const timestampHTML =
       props.showDate && result.timestamp !== undefined
         ? `<div class="search-result-date">${escapeHTML(formatDate(result.timestamp))}</div>`
         : '';
     const metadataHTML =
-      (props.showUrl && result.url) || timestampHTML
+      (props.showUrl && safeUrl) || timestampHTML
         ? `<div class="search-result-metadata">
-            ${props.showUrl && result.url ? `<span class="search-result-url">${displayUrl}</span>` : '<span class="search-result-url search-result-url-empty"></span>'}
+            ${props.showUrl && safeUrl ? `<span class="search-result-url">${displayUrl}</span>` : '<span class="search-result-url search-result-url-empty"></span>'}
             ${timestampHTML}
           </div>`
         : '';

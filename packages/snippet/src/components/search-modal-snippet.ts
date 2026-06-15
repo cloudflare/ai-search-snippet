@@ -28,6 +28,7 @@ import {
   parseBooleanAttribute,
   parseNumberAttribute,
 } from '../utils/index.ts';
+import { sanitizeUrl } from '../utils/url-safety.ts';
 
 const COMPONENT_NAME = 'search-modal-snippet';
 const DEFAULT_RENDER_RESULTS = 10;
@@ -487,12 +488,15 @@ export class SearchModalSnippet extends HTMLElement {
       })
     );
 
-    // Navigate to URL - click the active link element to trigger navigation
+    // Navigate to URL - click the active link element to trigger navigation.
+    // Gate the programmatic click on the allowlisted scheme check so the
+    // Enter-key selection follows the same policy as a mouse click on the
+    // rendered anchor (whose href is already `#` for non-allowlisted URLs).
     const activeItem = this.resultsContainer?.querySelector(
       `.modal-result-item[data-index="${this.activeIndex}"]`
     ) as HTMLAnchorElement | null;
 
-    if (activeItem && result.url) {
+    if (activeItem && sanitizeUrl(result.url)) {
       activeItem.click();
     }
 
@@ -593,16 +597,22 @@ export class SearchModalSnippet extends HTMLElement {
     const imageHTML = props.hideThumbnails
       ? ''
       : this.renderResultImage(result.image, result.title);
-    const href = result.url ? escapeHTML(result.url) : '#';
-    const displayUrl = result.url ? escapeHTML(formatDisplayUrl(result.url)) : '';
+    // Restrict result.url to an allowlisted set of URL schemes before
+    // stamping it into the anchor href / data-url. The URL originates
+    // from the search API's `chunk.item.key` field and is not a
+    // same-origin value. Also consumed by `selectActiveResult` to gate
+    // the programmatic click triggered by the Enter key.
+    const safeUrl = sanitizeUrl(result.url);
+    const href = safeUrl ? escapeHTML(safeUrl) : '#';
+    const displayUrl = safeUrl ? escapeHTML(formatDisplayUrl(safeUrl)) : '';
     const timestampHTML =
       props.showDate && result.timestamp !== undefined
         ? `<div class="modal-result-date">${escapeHTML(formatDate(result.timestamp))}</div>`
         : '';
     const metadataHTML =
-      (props.showUrl && result.url) || timestampHTML
+      (props.showUrl && safeUrl) || timestampHTML
         ? `<div class="modal-result-metadata">
-            ${props.showUrl && result.url ? `<span class="modal-result-url">${displayUrl}</span>` : '<span class="modal-result-url modal-result-url-empty"></span>'}
+            ${props.showUrl && safeUrl ? `<span class="modal-result-url">${displayUrl}</span>` : '<span class="modal-result-url modal-result-url-empty"></span>'}
             ${timestampHTML}
           </div>`
         : '';
@@ -617,7 +627,7 @@ export class SearchModalSnippet extends HTMLElement {
         tabindex="-1"
         data-index="${index}"
         data-result-id="${escapeHTML(result.id || '')}"
-        data-url="${escapeHTML(result.url || '')}"
+        data-url="${escapeHTML(safeUrl)}"
       >
         ${imageHTML}
         <div class="modal-result-content">
