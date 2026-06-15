@@ -29,13 +29,13 @@ const spanishTranslations: Translations = {
   <HelloWorld msg="Vite + Vue" />
   <!-- Vue routes rich object bindings to the matching property on custom elements -->
   <search-bar-snippet
-    apiUrl="http://localhost:8787"
+    api-url="http://localhost:8787"
     :translations="spanishTranslations"
   />
   <br />
   <button @click="modalSearch.open()">Show Modal Search (CMD+K)</button>
 
-  <search-modal-snippet apiUrl="http://localhost:8787" ref="modalSearch" />
+  <search-modal-snippet api-url="http://localhost:8787" ref="modalSearch" />
 </template>
 
 <style scoped>
