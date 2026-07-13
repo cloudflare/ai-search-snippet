@@ -1,6 +1,7 @@
 import type { SearchResult } from '../types/index.ts';
 
 export const RECENT_RESULTS_STORAGE_KEY = 'search-snippet:recent-results';
+export const FAVORITE_RESULTS_STORAGE_KEY = 'search-snippet:favorite-results';
 export const DEFAULT_STORED_RESULTS_LIMIT = 5;
 
 function isSearchResult(value: unknown): value is SearchResult {
@@ -22,6 +23,11 @@ function isSearchResult(value: unknown): value is SearchResult {
 
 function getResultKey(result: SearchResult): string {
   return result.url || result.id;
+}
+
+export function hasStoredResult(results: SearchResult[], result: SearchResult): boolean {
+  const resultKey = getResultKey(result);
+  return results.some((storedResult) => getResultKey(storedResult) === resultKey);
 }
 
 export function loadStoredResults(storageKey: string): SearchResult[] {
@@ -51,6 +57,24 @@ export function storeRecentResult(
     localStorage.setItem(storageKey, JSON.stringify(updatedResults));
   } catch {
     // Storage can be unavailable or full. Keep search result navigation working.
+  }
+
+  return updatedResults;
+}
+
+export function toggleFavoriteResult(
+  result: SearchResult,
+  storageKey = FAVORITE_RESULTS_STORAGE_KEY
+): SearchResult[] {
+  const favoriteResults = loadStoredResults(storageKey);
+  const updatedResults = hasStoredResult(favoriteResults, result)
+    ? favoriteResults.filter((storedResult) => getResultKey(storedResult) !== getResultKey(result))
+    : [result, ...favoriteResults];
+
+  try {
+    localStorage.setItem(storageKey, JSON.stringify(updatedResults));
+  } catch {
+    // Storage can be unavailable or full. Keep the modal interaction working.
   }
 
   return updatedResults;

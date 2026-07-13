@@ -1,9 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { SearchResult } from '../types/index.ts';
 import {
+  FAVORITE_RESULTS_STORAGE_KEY,
+  hasStoredResult,
   loadStoredResults,
   RECENT_RESULTS_STORAGE_KEY,
   storeRecentResult,
+  toggleFavoriteResult,
 } from './stored-results.ts';
 
 const firstResult: SearchResult = {
@@ -56,6 +59,18 @@ describe('stored results', () => {
       '3',
       '2',
     ]);
+  });
+
+  it('toggles favorite results without limiting the list', () => {
+    const secondResult = { ...firstResult, id: 'second', url: 'https://example.com/second' };
+
+    toggleFavoriteResult(firstResult);
+    const favorites = toggleFavoriteResult(secondResult);
+
+    expect(favorites.map((result) => result.id)).toEqual(['second', 'first']);
+    expect(hasStoredResult(favorites, firstResult)).toBe(true);
+    expect(toggleFavoriteResult(firstResult)).toEqual([secondResult]);
+    expect(loadStoredResults(FAVORITE_RESULTS_STORAGE_KEY)).toEqual([secondResult]);
   });
 
   it('ignores malformed and inaccessible storage', () => {

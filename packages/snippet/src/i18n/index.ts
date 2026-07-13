@@ -80,8 +80,14 @@ export interface Translations {
   groupOther?: string;
 
   // Modal-only
+  /** Heading above favorite results in the initial modal. */
+  favoriteResults?: string;
   /** Heading above results recently opened from the modal. */
   recentResults?: string;
+  /** Accessible label for a result's favorite button. */
+  addFavorite?: string;
+  /** Accessible label for a favorited result's remove button. */
+  removeFavorite?: string;
   /** Modal footer hint next to the ↑ ↓ keys. */
   navigateHint?: string;
   /** Modal footer hint next to the ↵ key. */

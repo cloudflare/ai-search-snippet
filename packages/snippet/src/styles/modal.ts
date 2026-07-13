@@ -177,8 +177,19 @@ export const modalStyles = `
   background: var(--search-snippet-background);
 }
 
+.modal-result-row {
+  position: relative;
+  display: flex;
+}
+
+
 a.modal-result-item {
+  flex: 1;
+  min-width: 0;
   padding: var(--search-snippet-spacing-md);
+  padding-right: calc(
+    36px + var(--search-snippet-spacing-md) + var(--search-snippet-spacing-md)
+  );
   background: transparent;
   border: var(--search-snippet-border-width) solid transparent;
   border-radius: calc(var(--search-snippet-border-radius) - 4px);
@@ -274,6 +285,54 @@ a.modal-result-item:focus-visible {
   outline-offset: -2px;
 }
 
+.modal-favorite-button {
+  position: absolute;
+  top: 50%;
+  right: var(--search-snippet-spacing-md);
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  padding: 8px;
+  transform: translateY(-50%);
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--search-snippet-text-secondary);
+  cursor: pointer;
+  transition: var(--search-snippet-transition-fast);
+}
+
+.modal-favorite-button:hover,
+.modal-favorite-button:focus-visible {
+  background: var(--search-snippet-hover-background);
+  color: var(--search-snippet-primary-color);
+}
+
+.modal-favorite-button:focus-visible {
+  outline: 2px solid var(--search-snippet-primary-color);
+  outline-offset: -2px;
+}
+
+.modal-favorite-button svg {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linejoin: round;
+  stroke-width: 1.75;
+}
+
+.modal-favorite-button.favorite {
+  color: var(--search-snippet-primary-color);
+}
+
+.modal-favorite-button.favorite svg {
+  fill: currentColor;
+}
+
 .modal-result-title {
   font-size: var(--search-snippet-font-size-base);
   font-weight: var(--search-snippet-font-weight-medium);
@@ -334,6 +393,10 @@ a.modal-result-item:focus-visible {
   display: flex;
   flex-direction: column;
   gap: var(--search-snippet-spacing-xs);
+}
+
+.modal-initial-section + .modal-initial-section {
+  margin-top: var(--search-snippet-spacing-md);
 }
 
 .modal-initial-section-title {
