@@ -76,6 +76,8 @@ export interface Translations {
   modalResultsCountError?: string;
   /** Label for the "see more" link when `see-more` is configured. */
   seeMoreResults?: string;
+  /** Group header label for results missing the `group-by` metadata field. Default: "Other" */
+  groupOther?: string;
 
   // Modal-only
   /** Modal footer hint next to the ↑ ↓ keys. */

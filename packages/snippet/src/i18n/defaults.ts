@@ -35,6 +35,7 @@ export const DEFAULT_TRANSLATIONS: Required<Translations> = {
   modalResultsCountZero: '0 results',
   modalResultsCountError: 'Error',
   seeMoreResults: 'See more results',
+  groupOther: 'Other',
 
   // Modal-only
   navigateHint: 'Navigate',

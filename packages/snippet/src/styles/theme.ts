@@ -98,6 +98,9 @@ export const baseStyles = `
   /* Search */
   --search-snippet-icon-size: 20px;
   --search-snippet-icon-margin-left: 6px;
+  --search-snippet-result-icon-size: 20px;
+  --search-snippet-result-icon-color: var(--search-snippet-text-secondary);
+  --search-snippet-result-icon-active-color: var(--search-snippet-primary-color);
   --search-snippet-result-item-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
 
   /* Chat Bubble */
@@ -184,6 +187,21 @@ export const baseStyles = `
   box-sizing: border-box;
   margin: 0;
   padding: 0;
+}
+
+/* Metadata-driven result icons are hidden until an external ::part() rule displays them. */
+.result-icon {
+  display: none;
+  flex: 0 0 var(--search-snippet-result-icon-size);
+  width: var(--search-snippet-result-icon-size);
+  height: var(--search-snippet-result-icon-size);
+  color: var(--search-snippet-result-icon-color);
+}
+
+a:hover > .result-icon,
+a:focus-visible > .result-icon,
+a.active > .result-icon {
+  color: var(--search-snippet-result-icon-active-color);
 }
 
 /* Container */

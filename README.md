@@ -110,6 +110,7 @@ Additional attributes for `<search-bar-snippet>` and `<search-modal-snippet>`:
 | `debounce-ms`        | number  | `300`   | Input debounce delay in milliseconds                                              |
 | `show-url`           | boolean | `false` | Show URL in search results                                                        |
 | `show-date`          | boolean | `false` | Show result dates when a timestamp is available                                   |
+| `group-by`           | string  | -       | Group results by this item metadata field (e.g. `group`). Missing values fall into an "Other" bucket |
 | `request-options`    | JSON string | -   | Extra headers, query params, and body fields for search requests                  |
 
 ### Modal-Specific Attributes
@@ -296,6 +297,8 @@ chat-page-snippet {
   /* Text */
   --search-snippet-text-color: #212529;
   --search-snippet-text-secondary: #6c757d;
+  --search-snippet-result-icon-color: var(--search-snippet-text-secondary);
+  --search-snippet-result-icon-active-color: var(--search-snippet-primary-color);
 
   /* Border & Focus */
   --search-snippet-border-color: #dee2e6;
@@ -349,6 +352,7 @@ chat-page-snippet {
   --search-snippet-button-height: 36px;
   --search-snippet-icon-size: 20px;
   --search-snippet-icon-margin-left: 6px;
+  --search-snippet-result-icon-size: 20px;
 
   /* ========== BORDER ========== */
   --search-snippet-border-width: 1px;
@@ -387,6 +391,26 @@ chat-page-snippet {
   --chat-bubble-position: fixed;
 }
 ```
+
+### Metadata for result icons
+
+Set item `metadata.icon` to a lowercase kebab-case label. Valid labels add
+`result-icon` and `result-icon-{label}` CSS Shadow Parts to a decorative icon element:
+
+```css
+search-bar-snippet::part(result-icon-labelhere),
+search-modal-snippet::part(result-icon-labelhere) {
+  display: block;
+  background-color: currentColor;
+  mask: url('/icons/page.svg') center / contain no-repeat;
+  -webkit-mask: url('/icons/page.svg') center / contain no-repeat;
+}
+```
+
+Icons remain hidden until a matching `::part()` rule displays them. They are independent from
+thumbnails; use `hide-thumbnails="true"` for icon-only results. Size and interactive colors use
+`--search-snippet-result-icon-size`, `--search-snippet-result-icon-color`, and
+`--search-snippet-result-icon-active-color`.
 
 ### Theme Examples
 

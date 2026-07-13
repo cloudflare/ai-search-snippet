@@ -62,6 +62,7 @@ export const API_REFERENCE_SECTIONS: readonly ReferenceSectionData[] = [
           ['show-url', 'boolean', 'false', 'Show URL in search results'],
           ['show-date', 'boolean', 'false', 'Show result dates when a timestamp is available'],
           ['hide-thumbnails', 'boolean', 'false', 'Hide result thumbnails/images'],
+          ['group-by', 'string', '-', 'Group results by an item metadata field'],
           [
             'request-options',
             'JSON string',
@@ -107,6 +108,7 @@ export const API_REFERENCE_SECTIONS: readonly ReferenceSectionData[] = [
           ['show-url', 'boolean', 'false', 'Show URL in search results'],
           ['show-date', 'boolean', 'false', 'Show result dates when a timestamp is available'],
           ['hide-thumbnails', 'boolean', 'false', 'Hide result thumbnails/images'],
+          ['group-by', 'string', '-', 'Group results by an item metadata field'],
           [
             'request-options',
             'JSON string',
@@ -140,6 +142,22 @@ export const API_REFERENCE_SECTIONS: readonly ReferenceSectionData[] = [
           ['search(query)', 'query: string', 'Promise<void>', 'Open modal and perform search'],
           ['getResults()', '-', 'SearchResult[]', 'Get current search results'],
           ['isModalOpen()', '-', 'boolean', 'Check if modal is currently open'],
+        ],
+      },
+    ],
+  },
+  {
+    id: 'result-icons',
+    title: 'Metadata-driven Result Icons',
+    description:
+      'Set item metadata.icon to a lowercase kebab-case slug such as "page" or "section". Search components expose matching CSS Shadow Parts; icons remain collapsed until a ::part() rule gives them a display value.',
+    tables: [
+      {
+        columns: ['Metadata value', 'CSS selector', 'Description'],
+        codeColumns: [0, 1],
+        rows: [
+          ['page', '::part(result-icon-page)', 'Style a page icon'],
+          ['section', '::part(result-icon-section)', 'Style a section icon or text glyph'],
         ],
       },
     ],
@@ -376,6 +394,16 @@ export const CSS_VARIABLE_SECTIONS: readonly ReferenceSectionData[] = [
           ['--search-snippet-text-color', '#212529', 'Primary text color'],
           ['--search-snippet-text-secondary', '#6c757d', 'Secondary/muted text'],
           [
+            '--search-snippet-result-icon-color',
+            'var(--search-snippet-text-secondary)',
+            'Resting metadata-driven result icon color',
+          ],
+          [
+            '--search-snippet-result-icon-active-color',
+            'var(--search-snippet-primary-color)',
+            'Active, hovered, or focused result icon color',
+          ],
+          [
             '--search-snippet-text-description',
             '#495057',
             'Search result description text (higher contrast)',
@@ -495,6 +523,7 @@ export const CSS_VARIABLE_SECTIONS: readonly ReferenceSectionData[] = [
           ['--search-snippet-input-height', '44px', 'Input field height'],
           ['--search-snippet-button-height', '36px', 'Button height'],
           ['--search-snippet-icon-size', '20px', 'Icon size'],
+          ['--search-snippet-result-icon-size', '20px', 'Metadata-driven result icon size'],
         ],
       },
     ],

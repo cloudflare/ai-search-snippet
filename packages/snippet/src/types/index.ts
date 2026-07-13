@@ -33,6 +33,12 @@ export interface SearchSnippetProps {
   /** URL template for "See more" link. The search query is appended URL-encoded. Example: "https://example.com/search?q=" */
   seeMore?: string;
   /**
+   * Group rendered results by this item metadata field (e.g. "group" or
+   * "product"). Groups are ordered by the first result that appears in each,
+   * and results within a group keep their relevance order. 
+   */
+  groupBy?: string;
+  /**
    * Disable sending search / click / view-more analytics events to the
    * `/stats` endpoint. Defaults to `false` (analytics enabled).
    */
@@ -217,6 +223,7 @@ export interface Item {
 
 export interface Metadata {
   description: string;
+  icon?: string;
   image?: string;
   title: string;
 }
