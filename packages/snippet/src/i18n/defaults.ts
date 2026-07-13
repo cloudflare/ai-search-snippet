@@ -38,6 +38,7 @@ export const DEFAULT_TRANSLATIONS: Required<Translations> = {
   groupOther: 'Other',
 
   // Modal-only
+  recentResults: 'Recent',
   navigateHint: 'Navigate',
   selectHint: 'Select',
   closeHint: 'Close',

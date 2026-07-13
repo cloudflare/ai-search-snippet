@@ -80,6 +80,8 @@ export interface Translations {
   groupOther?: string;
 
   // Modal-only
+  /** Heading above results recently opened from the modal. */
+  recentResults?: string;
   /** Modal footer hint next to the ↑ ↓ keys. */
   navigateHint?: string;
   /** Modal footer hint next to the ↵ key. */

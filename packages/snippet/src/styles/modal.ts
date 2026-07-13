@@ -329,6 +329,23 @@ a.modal-result-item:focus-visible {
   text-decoration: underline;
 }
 
+/* Initial modal sections */
+.modal-initial-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--search-snippet-spacing-xs);
+}
+
+.modal-initial-section-title {
+  margin: 0;
+  padding: var(--search-snippet-spacing-xs) var(--search-snippet-spacing-md);
+  color: var(--search-snippet-text-secondary);
+  font-size: var(--search-snippet-font-size-sm);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
 /* Result group header */
 .modal-group-header {
   padding: var(--search-snippet-spacing-sm) var(--search-snippet-spacing-md);

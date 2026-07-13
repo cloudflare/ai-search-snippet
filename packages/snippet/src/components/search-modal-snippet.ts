@@ -31,6 +31,11 @@ import {
   renderResultGroups,
   renderResultIcon,
 } from '../utils/index.ts';
+import {
+  loadStoredResults,
+  RECENT_RESULTS_STORAGE_KEY,
+  storeRecentResult,
+} from '../utils/stored-results.ts';
 import { sanitizeUrl } from '../utils/url-safety.ts';
 
 const COMPONENT_NAME = 'search-modal-snippet';
@@ -321,9 +326,7 @@ export class SearchModalSnippet extends HTMLElement {
           />
         </div>
         <div class="modal-content">
-          <div class="modal-results" id="modal-results-list" role="listbox" aria-label="${escapeHTML(t.searchResultsAriaLabel)}">
-            ${this.renderEmptyState()}
-          </div>
+          <div class="modal-results" id="modal-results-list" role="listbox" aria-label="${escapeHTML(t.searchResultsAriaLabel)}"></div>
         </div>
         <div class="modal-footer">
           <div class="modal-footer-hints">
@@ -362,6 +365,8 @@ export class SearchModalSnippet extends HTMLElement {
     // Show error immediately if api-url was missing when the component was connected
     if (!this.client) {
       this.showMissingApiUrlError();
+    } else {
+      this.showEmptyState();
     }
   }
 
@@ -700,8 +705,14 @@ export class SearchModalSnippet extends HTMLElement {
         const resultId = item.getAttribute('data-result-id') ?? '';
         const index = indexAttr !== null ? Number.parseInt(indexAttr, 10) : Number.NaN;
 
-        if (!Number.isNaN(index) && resultId) {
-          this.stats?.trackClick(this.lastSearchQuery, this.lastSearchTotal, resultId, index);
+        if (!Number.isNaN(index)) {
+          const result = this.results[index];
+          if (result) {
+            storeRecentResult(result);
+          }
+          if (resultId) {
+            this.stats?.trackClick(this.lastSearchQuery, this.lastSearchTotal, resultId, index);
+          }
         }
         return;
       }
@@ -762,17 +773,35 @@ export class SearchModalSnippet extends HTMLElement {
     `;
   }
 
+  private renderRecentResults(results: SearchResult[]): string {
+    if (results.length === 0) return this.renderEmptyState();
+
+    return `
+      <section class="modal-initial-section" aria-labelledby="modal-recent-results-title">
+        <h2 class="modal-initial-section-title" id="modal-recent-results-title">
+          ${escapeHTML(this.resolvedTranslations.recentResults)}
+        </h2>
+        ${results.map((result, index) => this.renderResult(result, index)).join('')}
+      </section>
+    `;
+  }
+
   private showEmptyState(): void {
     this.clearLoadingInterval();
     if (!this.resultsContainer) return;
-    this.resultsContainer.innerHTML = this.renderEmptyState();
+
+    this.results = loadStoredResults(RECENT_RESULTS_STORAGE_KEY);
+    this.activeIndex = this.results.length > 0 ? 0 : -1;
+    this.resultsContainer.innerHTML = this.renderRecentResults(this.results);
+    this.attachResultHandlers();
+    this.updateActiveResult();
 
     if (this.footerCount) {
       this.footerCount.textContent = '';
     }
 
     if (this.inputElement) {
-      this.inputElement.setAttribute('aria-expanded', 'false');
+      this.inputElement.setAttribute('aria-expanded', String(this.results.length > 0));
     }
   }
 
