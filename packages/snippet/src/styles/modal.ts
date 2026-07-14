@@ -400,6 +400,9 @@ a.modal-result-item:focus-visible {
 }
 
 .modal-initial-section-title {
+  display: flex;
+  align-items: center;
+  gap: var(--search-snippet-spacing-xs);
   margin: 0;
   padding: var(--search-snippet-spacing-xs) var(--search-snippet-spacing-md);
   color: var(--search-snippet-text-secondary);
@@ -407,6 +410,16 @@ a.modal-result-item:focus-visible {
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.05em;
+}
+
+.modal-initial-section-title svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.75;
 }
 
 /* Result group header */

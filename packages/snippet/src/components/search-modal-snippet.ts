@@ -822,13 +822,28 @@ export class SearchModalSnippet extends HTMLElement {
     results: SearchResult[],
     title: string,
     id: string,
-    startIndex: number
+    startIndex: number,
+    icon: 'favorite' | 'recent'
   ): string {
     if (results.length === 0) return '';
 
+    const iconHTML =
+      icon === 'favorite'
+        ? `<svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="m12 2.7 2.8 5.7 6.2.9-4.5 4.4 1.1 6.2-5.6-3-5.6 3 1.1-6.2L3 9.3l6.2-.9L12 2.7Z"></path>
+          </svg>`
+        : `<svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M3 12a9 9 0 1 0 3-6.7L3 8"></path>
+            <path d="M3 3v5h5"></path>
+            <path d="M12 7v5l4 2"></path>
+          </svg>`;
+
     return `
       <section class="modal-initial-section" aria-labelledby="${id}">
-        <h2 class="modal-initial-section-title" id="${id}">${escapeHTML(title)}</h2>
+        <h2 class="modal-initial-section-title" id="${id}">
+          ${iconHTML}
+          <span>${escapeHTML(title)}</span>
+        </h2>
         ${results.map((result, index) => this.renderResult(result, startIndex + index)).join('')}
       </section>
     `;
@@ -850,12 +865,14 @@ export class SearchModalSnippet extends HTMLElement {
             this.favoriteResults,
             this.resolvedTranslations.favoriteResults,
             'modal-favorite-results-title',
-            0
+            0,
+            'favorite'
           )}${this.renderInitialSection(
             recentResults,
             this.resolvedTranslations.recentResults,
             'modal-recent-results-title',
-            this.favoriteResults.length
+            this.favoriteResults.length,
+            'recent'
           )}`
         : this.renderEmptyState();
     this.attachResultHandlers();
