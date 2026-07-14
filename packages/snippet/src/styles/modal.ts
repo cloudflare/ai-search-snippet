@@ -137,6 +137,46 @@ export const modalStyles = `
   gap: var(--search-snippet-spacing-xs);
 }
 
+.result-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--search-snippet-spacing-xs);
+}
+
+.result-group + .result-group {
+  margin-top: var(--search-snippet-spacing-sm);
+}
+
+.result-group-header {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  padding: var(--search-snippet-spacing-xs) var(--search-snippet-spacing-md);
+  background: var(--search-snippet-surface);
+  color: var(--search-snippet-text-secondary);
+  font-size: var(--search-snippet-font-size-sm);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/*
+ * Mask the scroll container's top padding while the header is pinned so
+ * result items don't peek through as a sliver between the search input and
+ * the (sticky) category header. The pseudo-element rides above the header,
+ * painted with the modal background, covering the padding gap and giving a
+ * clean cutoff for items scrolling underneath.
+ */
+.result-group-header::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 100%;
+  height: var(--search-snippet-spacing-sm);
+  background: var(--search-snippet-background);
+}
+
 a.modal-result-item {
   padding: var(--search-snippet-spacing-md);
   background: transparent;

@@ -4,7 +4,7 @@
 
 import { AISearchClient } from '../api/ai-search.ts';
 import { interpolate, mergeTranslations, type Translations } from '../i18n/index.ts';
-import type { SearchSnippetProps } from '../types/index.ts';
+import type { SearchResult, SearchSnippetProps } from '../types/index.ts';
 
 export { LOADING_MESSAGE_INTERVAL_MS, LOADING_MESSAGES } from './loading-messages.ts';
 
@@ -143,6 +143,13 @@ export function parseNumberAttribute(value: string | null, defaultValue: number)
   return Number.isNaN(parsed) ? defaultValue : parsed;
 }
 
+/** Render a metadata-driven result icon when its slug is safe for a part token. */
+export function renderResultIcon(value: unknown): string {
+  if (typeof value !== 'string' || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(value)) return '';
+
+  return `<span class="result-icon" part="result-icon result-icon-${value}" aria-hidden="true"></span>`;
+}
+
 /**
  * Parse the `chat-query-rewrite` attribute payload (a JSON object) into a
  * `SearchSnippetProps['chatQueryRewrite']`. Returns `undefined` when the
@@ -193,6 +200,49 @@ export function createCustomEvent<T>(name: string, detail: T): CustomEvent<T> {
     composed: true,
     cancelable: true,
   });
+}
+
+interface ResultGroup {
+  key: string;
+  results: SearchResult[];
+}
+
+/** Group results by a metadata value while preserving first-seen order. */
+export function groupResultsByMetadata(
+  results: SearchResult[],
+  field: string,
+  otherLabel = 'Other'
+): ResultGroup[] {
+  const groups = new Map<string, SearchResult[]>();
+
+  for (const result of results) {
+    const raw = result.metadata?.[field];
+    const key =
+      raw === undefined || raw === null || String(raw).trim() === '' ? otherLabel : String(raw);
+    const group = groups.get(key);
+    if (group) group.push(result);
+    else groups.set(key, [result]);
+  }
+
+  return [...groups].map(([key, groupedResults]) => ({ key, results: groupedResults }));
+}
+
+/** Render grouped results with indexes matching their displayed order. */
+export function renderResultGroups(
+  groups: ResultGroup[],
+  renderResult: (result: SearchResult, index: number) => string
+): string {
+  let index = 0;
+  return groups
+    .map(
+      (group, groupIndex) => `
+        <div class="result-group" role="group" aria-labelledby="result-group-label-${groupIndex}">
+          <div class="result-group-header" id="result-group-label-${groupIndex}" role="presentation">${escapeHTML(group.key)}</div>
+          ${group.results.map((result) => renderResult(result, index++)).join('')}
+        </div>
+      `
+    )
+    .join('');
 }
 
 /**

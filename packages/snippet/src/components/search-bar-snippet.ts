@@ -22,10 +22,13 @@ import {
   escapeHTML,
   formatDate,
   formatDisplayUrl,
+  groupResultsByMetadata,
   LOADING_MESSAGE_INTERVAL_MS,
   parseAttribute,
   parseBooleanAttribute,
   parseNumberAttribute,
+  renderResultGroups,
+  renderResultIcon,
 } from '../utils/index.ts';
 import { sanitizeUrl } from '../utils/url-safety.ts';
 
@@ -180,6 +183,7 @@ export class SearchBarSnippet extends HTMLElement {
       showDate: parseBooleanAttribute(this.getAttribute('show-date'), false),
       hideThumbnails: parseBooleanAttribute(this.getAttribute('hide-thumbnails'), false),
       seeMore: parseAttribute(this.getAttribute('see-more'), ''),
+      groupBy: parseAttribute(this.getAttribute('group-by'), ''),
       disableAnalytics: parseBooleanAttribute(this.getAttribute('disable-analytics'), false),
       translations: this.translationsOverride ?? undefined,
     };
@@ -423,7 +427,14 @@ export class SearchBarSnippet extends HTMLElement {
                 ${brandingHTML}
             </div>
             <div class="search-results">
-                ${results.map((result, index) => this.renderResult(result, index)).join('')}
+                ${
+                  props.groupBy
+                    ? renderResultGroups(
+                        groupResultsByMetadata(results, props.groupBy, t.groupOther),
+                        (result, index) => this.renderResult(result, index)
+                      )
+                    : results.map((result, index) => this.renderResult(result, index)).join('')
+                }
             </div>
             ${seeMoreHTML}
         `;
@@ -436,6 +447,7 @@ export class SearchBarSnippet extends HTMLElement {
 
   private renderResult(result: SearchResult, index: number): string {
     const props = this.getProps();
+    const iconHTML = renderResultIcon(result.metadata?.icon);
     const imageHTML = props.hideThumbnails
       ? ''
       : this.renderResultImage(result.image, result.title);
@@ -459,6 +471,7 @@ export class SearchBarSnippet extends HTMLElement {
 
     return `
             <a href="${href}" class="search-result-item" data-index="${index}" data-result-id="${escapeHTML(result.id || '')}">
+                ${iconHTML}
                 ${imageHTML}
                 <div class="search-result-content">
                     <div class="search-result-title">${escapeHTML(result.title || '')}</div>

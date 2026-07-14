@@ -23,10 +23,13 @@ import {
   escapeHTML,
   formatDate,
   formatDisplayUrl,
+  groupResultsByMetadata,
   LOADING_MESSAGE_INTERVAL_MS,
   parseAttribute,
   parseBooleanAttribute,
   parseNumberAttribute,
+  renderResultGroups,
+  renderResultIcon,
 } from '../utils/index.ts';
 import { sanitizeUrl } from '../utils/url-safety.ts';
 
@@ -219,6 +222,7 @@ export class SearchModalSnippet extends HTMLElement {
       showDate: parseBooleanAttribute(this.getAttribute('show-date'), false),
       hideThumbnails: parseBooleanAttribute(this.getAttribute('hide-thumbnails'), false),
       seeMore: parseAttribute(this.getAttribute('see-more'), ''),
+      groupBy: parseAttribute(this.getAttribute('group-by'), ''),
       disableAnalytics: parseBooleanAttribute(this.getAttribute('disable-analytics'), false),
       translations: this.translationsOverride ?? undefined,
     };
@@ -526,12 +530,11 @@ export class SearchModalSnippet extends HTMLElement {
         maxResults: props.maxResults || DEFAULT_REQUEST_MAX_RESULTS,
         request: this.getRequestOptions(),
       });
-      this.results = results.slice(0, props.maxRenderResults || DEFAULT_RENDER_RESULTS);
-      this.activeIndex = this.results.length > 0 ? 0 : -1;
+      const visibleResults = results.slice(0, props.maxRenderResults || DEFAULT_RENDER_RESULTS);
       this.lastSearchQuery = query;
       this.lastSearchTotal = results.length;
       this.stats?.trackSearch(query, results.length);
-      this.displayResults(this.results, query, results.length);
+      this.displayResults(visibleResults, query, results.length);
     } catch (error) {
       // Don't show error state for cancelled requests
       if ((error as Error).name === 'AbortError') {
@@ -548,17 +551,25 @@ export class SearchModalSnippet extends HTMLElement {
     query: string,
     totalResults = results.length
   ): void {
+    const props = this.getProps();
+    const t = this.resolvedTranslations;
+    const groups = props.groupBy
+      ? groupResultsByMetadata(results, props.groupBy, t.groupOther)
+      : null;
+    this.results = groups ? groups.flatMap((group) => group.results) : results;
+    this.activeIndex = this.results.length > 0 ? 0 : -1;
+
     this.clearLoadingInterval();
     if (!this.resultsContainer) return;
 
-    if (results.length === 0) {
+    if (this.results.length === 0) {
       this.showNoResultsState(query);
       return;
     }
 
-    const props = this.getProps();
-    const t = this.resolvedTranslations;
-    const resultsHTML = results.map((result, index) => this.renderResult(result, index)).join('');
+    const resultsHTML = groups
+      ? renderResultGroups(groups, (result, index) => this.renderResult(result, index))
+      : this.results.map((result, index) => this.renderResult(result, index)).join('');
     const hasMoreResults = totalResults > results.length;
     const resultsCountLabel = hasMoreResults
       ? interpolate(t.resultsCountOverflow, { n: results.length, total: totalResults })
@@ -594,6 +605,7 @@ export class SearchModalSnippet extends HTMLElement {
 
   private renderResult(result: SearchResult, index: number): string {
     const props = this.getProps();
+    const iconHTML = renderResultIcon(result.metadata?.icon);
     const imageHTML = props.hideThumbnails
       ? ''
       : this.renderResultImage(result.image, result.title);
@@ -629,6 +641,7 @@ export class SearchModalSnippet extends HTMLElement {
         data-result-id="${escapeHTML(result.id || '')}"
         data-url="${escapeHTML(safeUrl)}"
       >
+        ${iconHTML}
         ${imageHTML}
         <div class="modal-result-content">
           <div class="modal-result-title">${escapeHTML(result.title || '')}</div>

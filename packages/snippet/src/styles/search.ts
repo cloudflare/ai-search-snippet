@@ -137,6 +137,25 @@ export const searchStyles = `
   gap: var(--search-snippet-spacing-sm);
 }
 
+.result-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--search-snippet-spacing-sm);
+}
+
+.result-group + .result-group {
+  margin-top: var(--search-snippet-spacing-md);
+}
+
+.result-group-header {
+  padding: var(--search-snippet-spacing-xs) 0;
+  color: var(--search-snippet-text-secondary);
+  font-size: var(--search-snippet-font-size-sm);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
 a.search-result-item {
   display: flex;
   flex-direction: row;
