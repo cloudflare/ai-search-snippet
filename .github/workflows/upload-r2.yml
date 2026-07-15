@@ -5,6 +5,10 @@ on:
     workflows: ["Create Release"]
     types: [completed]
 
+concurrency:
+  group: upload-r2-${{ github.event.workflow_run.head_sha }}
+  cancel-in-progress: false
+
 jobs:
   upload:
     runs-on: ubuntu-latest
@@ -19,17 +23,6 @@ jobs:
           ref: ${{ github.event.workflow_run.head_sha }}
           fetch-depth: 0
 
-      - name: Resolve release tag
-        run: |
-          set -euo pipefail
-          git fetch --tags
-          SHA="${{ github.event.workflow_run.head_sha }}"
-          TAG="$(git tag --points-at "$SHA" | grep -E '^v' | head -n 1 || true)"
-          if [ -z "$TAG" ]; then
-            TAG="sha-${SHA:0:7}"
-          fi
-          echo "RELEASE_TAG=$TAG" >> "$GITHUB_ENV"
-
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
 
@@ -39,11 +32,30 @@ jobs:
           node-version: "24"
           cache: pnpm
 
+      - name: Resolve release tag
+        run: |
+          set -euo pipefail
+          git fetch --tags
+          SHA="${{ github.event.workflow_run.head_sha }}"
+          PACKAGE_VERSION="$(node -p "require('./packages/snippet/package.json').version")"
+          TAG="v${PACKAGE_VERSION}"
+          TAG_SHA="$(git rev-list -n 1 "${TAG}" || true)"
+
+          if [ -z "${TAG_SHA}" ]; then
+            echo "Expected release tag ${TAG} does not exist." >&2
+            exit 1
+          fi
+          if [ "${TAG_SHA}" != "${SHA}" ]; then
+            echo "Release tag ${TAG} points to ${TAG_SHA}, expected ${SHA}." >&2
+            exit 1
+          fi
+          echo "RELEASE_TAG=${TAG}" >> "$GITHUB_ENV"
+
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Build library
-        run: pnpm --filter @cloudflare/ai-search-snippet run build
+      - name: Build CDN artifacts
+        run: pnpm --filter @cloudflare/ai-search-snippet run build:cdn
 
       - name: Install AWS CLI
         run: |
@@ -51,7 +63,7 @@ jobs:
           python3 -m pip install --upgrade pip
           pip3 install awscli
 
-      - name: Upload dist/ to R2
+      - name: Upload CDN artifacts to R2
         env:
           R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
           R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
@@ -72,10 +84,110 @@ jobs:
           ENDPOINT="https://${CLOUDFLARE_ACCOUNT_ID}.r2.cloudflarestorage.com"
 
           PREFIX="${RELEASE_TAG}/"
+          CACHE_CONTROL="public, max-age=31536000, immutable"
 
-          aws s3 sync packages/snippet/dist "s3://${R2_BUCKET}/${PREFIX}" \
-            --endpoint-url "${ENDPOINT}" \
-            --delete \
-            --cache-control "public, max-age=31536000, immutable"
+          verify_existing_file() {
+            local file="$1"
+            local key="$2"
+            local expected_content_type="$3"
+            local remote_metadata
+            local metadata_fields=()
+            local remote_etag
+            local remote_content_type
+            local remote_cache_control
+            local local_etag
+
+            if ! remote_metadata="$(aws s3api head-object \
+              --bucket "${R2_BUCKET}" \
+              --key "${key}" \
+              --output json \
+              --endpoint-url "${ENDPOINT}" 2>/dev/null)"; then
+              return 1
+            fi
+
+            mapfile -t metadata_fields < <(
+              REMOTE_METADATA="${remote_metadata}" python3 -c \
+                'import json, os; value = json.loads(os.environ["REMOTE_METADATA"]); print(value["ETag"].strip("\"")); print(value.get("ContentType", "")); print(value.get("CacheControl", ""))'
+            )
+            remote_etag="${metadata_fields[0]:-}"
+            remote_content_type="${metadata_fields[1]:-}"
+            remote_cache_control="${metadata_fields[2]:-}"
+            read -r local_etag _ < <(md5sum "${file}")
+
+            if [ "${remote_etag}" != "${local_etag}" ] || \
+              [ "${remote_content_type}" != "${expected_content_type}" ] || \
+              [ "${remote_cache_control}" != "${CACHE_CONTROL}" ]; then
+              echo "Refusing mismatched immutable object s3://${R2_BUCKET}/${key}." >&2
+              return 2
+            fi
+            return 0
+          }
+
+          upload_file() {
+            local file="$1"
+            local relative_path="${file#packages/snippet/dist-cdn/}"
+            local key="${PREFIX}${relative_path}"
+            local content_type
+            local verification_status
+            local attempt
+
+            case "${file}" in
+              *.js) content_type="text/javascript" ;;
+              *.json|*.map) content_type="application/json" ;;
+              *.md) content_type="text/markdown; charset=utf-8" ;;
+              *) content_type="text/plain; charset=utf-8" ;;
+            esac
+
+            if verify_existing_file "${file}" "${key}" "${content_type}"; then
+              echo "Already uploaded: s3://${R2_BUCKET}/${key}"
+              return
+            else
+              verification_status=$?
+              if [ "${verification_status}" -eq 2 ]; then
+                return 1
+              fi
+            fi
+
+            for attempt in 1 2 3; do
+              if aws s3api put-object \
+                --bucket "${R2_BUCKET}" \
+                --key "${key}" \
+                --body "${file}" \
+                --content-type "${content_type}" \
+                --cache-control "${CACHE_CONTROL}" \
+                --if-none-match "*" \
+                --endpoint-url "${ENDPOINT}" >/dev/null; then
+                echo "Uploaded: s3://${R2_BUCKET}/${key}"
+                return
+              fi
+
+              if verify_existing_file "${file}" "${key}" "${content_type}"; then
+                echo "Uploaded concurrently: s3://${R2_BUCKET}/${key}"
+                return
+              else
+                verification_status=$?
+                if [ "${verification_status}" -eq 2 ]; then
+                  return 1
+                fi
+              fi
+
+              if [ "${attempt}" -lt 3 ]; then
+                sleep "${attempt}"
+              fi
+            done
+
+            echo "Failed to upload s3://${R2_BUCKET}/${key}." >&2
+            return 1
+          }
+
+          shopt -s globstar nullglob
+          for FILE in packages/snippet/dist-cdn/**/*; do
+            if [ -f "${FILE}" ] && [ "${FILE}" != "packages/snippet/dist-cdn/release-manifest.json" ]; then
+              upload_file "${FILE}"
+            fi
+          done
+
+          # This marker is uploaded last so an existing manifest means the release is complete.
+          upload_file "packages/snippet/dist-cdn/release-manifest.json"
 
           echo "Uploaded to: s3://${R2_BUCKET}/${PREFIX}"
