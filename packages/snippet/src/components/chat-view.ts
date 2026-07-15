@@ -39,6 +39,7 @@ export class ChatView {
   private messages: Message[] = [];
   private isStreaming = false;
   private currentStreamingMessageId: string | null = null;
+  private currentChatAbortController: AbortController | null = null;
   private loadingMessageInterval: ReturnType<typeof setInterval> | null = null;
   private loadingMessageIndex = 0;
   private pendingScrollFrame: number | null = null;
@@ -190,9 +191,16 @@ export class ChatView {
     this.currentStreamingMessageId = assistantMessageId;
     this.renderMessages(true);
 
+    const abortController = new AbortController();
+    this.currentChatAbortController = abortController;
+
     try {
       // Stream the response
-      const stream = this.client.chat(content, { history, queryRewrite });
+      const stream = this.client.chat(content, {
+        history,
+        queryRewrite,
+        signal: abortController.signal,
+      });
 
       let fullContent = '';
 
@@ -233,6 +241,9 @@ export class ChatView {
         })
       );
     } finally {
+      if (this.currentChatAbortController === abortController) {
+        this.currentChatAbortController = null;
+      }
       this.setStreamingState(false);
       this.renderMessages();
       this.currentStreamingMessageId = null;
@@ -522,9 +533,24 @@ export class ChatView {
   }
 
   /**
-   * Clear all messages
+   * Clear all messages. Aborts any in-flight stream and resets the input UI.
    */
   public clearMessages(): void {
+    if (this.currentChatAbortController) {
+      this.currentChatAbortController.abort();
+      this.currentChatAbortController = null;
+    }
+
+    if (this.isStreaming) {
+      this.setStreamingState(false);
+      this.currentStreamingMessageId = null;
+    }
+
+    if (this.pendingScrollFrame !== null) {
+      cancelAnimationFrame(this.pendingScrollFrame);
+      this.pendingScrollFrame = null;
+    }
+
     this.messages = [];
     this.renderMessages();
   }
@@ -579,6 +605,11 @@ export class ChatView {
    * Destroy and cleanup
    */
   public destroy(): void {
+    if (this.currentChatAbortController) {
+      this.currentChatAbortController.abort();
+      this.currentChatAbortController = null;
+    }
+
     this.clearLoadingMessages();
 
     if (this.pendingScrollFrame !== null) {
