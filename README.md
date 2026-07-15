@@ -597,6 +597,15 @@ nlweb-cl-snippet/
 └── README.md
 ```
 
+## Releasing
+
+To publish a new release:
+
+1. Bump the version in `packages/snippet/package.json` and commit to `main`.
+2. Go to **Actions > Create Release > Run workflow** on GitHub and enter the version (without the `v` prefix).
+
+The workflow validates the version, creates a git tag, and publishes a GitHub Release. Once it succeeds, three downstream workflows run automatically: npm publish, CDN upload to R2, and Workers demo site deployment.
+
 ## 📝 API Server Requirements
 
 The component expects the API server to implement the following endpoints:
