@@ -31,6 +31,14 @@ import {
   renderResultGroups,
   renderResultIcon,
 } from '../utils/index.ts';
+import {
+  FAVORITE_RESULTS_STORAGE_KEY,
+  hasStoredResult,
+  loadStoredResults,
+  RECENT_RESULTS_STORAGE_KEY,
+  storeRecentResult,
+  toggleFavoriteResult,
+} from '../utils/stored-results.ts';
 import { sanitizeUrl } from '../utils/url-safety.ts';
 
 const COMPONENT_NAME = 'search-modal-snippet';
@@ -55,6 +63,7 @@ export class SearchModalSnippet extends HTMLElement {
   private footerCount: HTMLElement | null = null;
   private isOpen = false;
   private results: SearchResult[] = [];
+  private favoriteResults: SearchResult[] = [];
   private activeIndex = -1;
   private debouncedSearch: (((query: string) => void) & { cancel: () => void }) | null = null;
   private currentSearchController: AbortController | null = null;
@@ -321,9 +330,7 @@ export class SearchModalSnippet extends HTMLElement {
           />
         </div>
         <div class="modal-content">
-          <div class="modal-results" id="modal-results-list" role="listbox" aria-label="${escapeHTML(t.searchResultsAriaLabel)}">
-            ${this.renderEmptyState()}
-          </div>
+          <div class="modal-results" id="modal-results-list" role="listbox" aria-label="${escapeHTML(t.searchResultsAriaLabel)}"></div>
         </div>
         <div class="modal-footer">
           <div class="modal-footer-hints">
@@ -362,6 +369,8 @@ export class SearchModalSnippet extends HTMLElement {
     // Show error immediately if api-url was missing when the component was connected
     if (!this.client) {
       this.showMissingApiUrlError();
+    } else {
+      this.showEmptyState();
     }
   }
 
@@ -557,6 +566,7 @@ export class SearchModalSnippet extends HTMLElement {
       ? groupResultsByMetadata(results, props.groupBy, t.groupOther)
       : null;
     this.results = groups ? groups.flatMap((group) => group.results) : results;
+    this.favoriteResults = loadStoredResults(FAVORITE_RESULTS_STORAGE_KEY);
     this.activeIndex = this.results.length > 0 ? 0 : -1;
 
     this.clearLoadingInterval();
@@ -628,27 +638,45 @@ export class SearchModalSnippet extends HTMLElement {
             ${timestampHTML}
           </div>`
         : '';
+    const isFavorite = hasStoredResult(this.favoriteResults, result);
+    const favoriteLabel = isFavorite
+      ? this.resolvedTranslations.removeFavorite
+      : this.resolvedTranslations.addFavorite;
 
     return `
-      <a 
-        href="${href}"
-        class="modal-result-item${index === this.activeIndex ? ' active' : ''}" 
-        role="option" 
-        id="result-${index}"
-        aria-selected="${index === this.activeIndex}"
-        tabindex="-1"
-        data-index="${index}"
-        data-result-id="${escapeHTML(result.id || '')}"
-        data-url="${escapeHTML(safeUrl)}"
-      >
-        ${iconHTML}
-        ${imageHTML}
-        <div class="modal-result-content">
-          <div class="modal-result-title">${escapeHTML(result.title || '')}</div>
-          ${result.description ? `<div class="modal-result-description">${escapeHTML(result.description)}</div>` : ''}
-          ${metadataHTML}
-        </div>
-      </a>
+      <div class="modal-result-row">
+        <a
+          href="${href}"
+          class="modal-result-item${index === this.activeIndex ? ' active' : ''}"
+          role="option"
+          id="result-${index}"
+          aria-selected="${index === this.activeIndex}"
+          tabindex="-1"
+          data-index="${index}"
+          data-result-id="${escapeHTML(result.id || '')}"
+          data-url="${escapeHTML(safeUrl)}"
+        >
+          ${iconHTML}
+          ${imageHTML}
+          <div class="modal-result-content">
+            <div class="modal-result-title">${escapeHTML(result.title || '')}</div>
+            ${result.description ? `<div class="modal-result-description">${escapeHTML(result.description)}</div>` : ''}
+            ${metadataHTML}
+          </div>
+        </a>
+        <button
+          type="button"
+          class="modal-favorite-button${isFavorite ? ' favorite' : ''}"
+          data-favorite-index="${index}"
+          aria-label="${escapeHTML(favoriteLabel)}"
+          title="${escapeHTML(favoriteLabel)}"
+          aria-pressed="${isFavorite}"
+        >
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="m12 2.7 2.8 5.7 6.2.9-4.5 4.4 1.1 6.2-5.6-3-5.6 3 1.1-6.2L3 9.3l6.2-.9L12 2.7Z"></path>
+          </svg>
+        </button>
+      </div>
     `;
   }
 
@@ -689,6 +717,28 @@ export class SearchModalSnippet extends HTMLElement {
       const target = e.target as Element | null;
       if (!target) return;
 
+      const favoriteButton = target.closest('.modal-favorite-button') as HTMLButtonElement | null;
+      if (favoriteButton) {
+        const index = Number.parseInt(favoriteButton.dataset.favoriteIndex ?? '', 10);
+        const result = this.results[index];
+        if (!Number.isNaN(index) && result) {
+          this.favoriteResults = toggleFavoriteResult(result);
+          if (this.inputElement?.value.trim()) {
+            const isFavorite = hasStoredResult(this.favoriteResults, result);
+            const label = isFavorite
+              ? this.resolvedTranslations.removeFavorite
+              : this.resolvedTranslations.addFavorite;
+            favoriteButton.classList.toggle('favorite', isFavorite);
+            favoriteButton.setAttribute('aria-pressed', String(isFavorite));
+            favoriteButton.setAttribute('aria-label', label);
+            favoriteButton.title = label;
+          } else {
+            this.showEmptyState();
+          }
+        }
+        return;
+      }
+
       const item = target.closest('.modal-result-item') as HTMLElement | null;
       if (item) {
         const href = item.getAttribute('href');
@@ -700,8 +750,14 @@ export class SearchModalSnippet extends HTMLElement {
         const resultId = item.getAttribute('data-result-id') ?? '';
         const index = indexAttr !== null ? Number.parseInt(indexAttr, 10) : Number.NaN;
 
-        if (!Number.isNaN(index) && resultId) {
-          this.stats?.trackClick(this.lastSearchQuery, this.lastSearchTotal, resultId, index);
+        if (!Number.isNaN(index)) {
+          const result = this.results[index];
+          if (result) {
+            storeRecentResult(result);
+          }
+          if (resultId) {
+            this.stats?.trackClick(this.lastSearchQuery, this.lastSearchTotal, resultId, index);
+          }
         }
         return;
       }
@@ -762,17 +818,72 @@ export class SearchModalSnippet extends HTMLElement {
     `;
   }
 
+  private renderInitialSection(
+    results: SearchResult[],
+    title: string,
+    id: string,
+    startIndex: number,
+    icon: 'favorite' | 'recent'
+  ): string {
+    if (results.length === 0) return '';
+
+    const iconHTML =
+      icon === 'favorite'
+        ? `<svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="m12 2.7 2.8 5.7 6.2.9-4.5 4.4 1.1 6.2-5.6-3-5.6 3 1.1-6.2L3 9.3l6.2-.9L12 2.7Z"></path>
+          </svg>`
+        : `<svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M3 12a9 9 0 1 0 3-6.7L3 8"></path>
+            <path d="M3 3v5h5"></path>
+            <path d="M12 7v5l4 2"></path>
+          </svg>`;
+
+    return `
+      <section class="modal-initial-section" aria-labelledby="${id}">
+        <h2 class="modal-initial-section-title" id="${id}">
+          ${iconHTML}
+          <span>${escapeHTML(title)}</span>
+        </h2>
+        ${results.map((result, index) => this.renderResult(result, startIndex + index)).join('')}
+      </section>
+    `;
+  }
+
   private showEmptyState(): void {
     this.clearLoadingInterval();
     if (!this.resultsContainer) return;
-    this.resultsContainer.innerHTML = this.renderEmptyState();
+
+    this.favoriteResults = loadStoredResults(FAVORITE_RESULTS_STORAGE_KEY);
+    const recentResults = loadStoredResults(RECENT_RESULTS_STORAGE_KEY).filter(
+      (result) => !hasStoredResult(this.favoriteResults, result)
+    );
+    this.results = [...this.favoriteResults, ...recentResults];
+    this.activeIndex = this.results.length > 0 ? 0 : -1;
+    this.resultsContainer.innerHTML =
+      this.results.length > 0
+        ? `${this.renderInitialSection(
+            this.favoriteResults,
+            this.resolvedTranslations.favoriteResults,
+            'modal-favorite-results-title',
+            0,
+            'favorite'
+          )}${this.renderInitialSection(
+            recentResults,
+            this.resolvedTranslations.recentResults,
+            'modal-recent-results-title',
+            this.favoriteResults.length,
+            'recent'
+          )}`
+        : this.renderEmptyState();
+    this.attachResultHandlers();
+    this.updateActiveResult();
 
     if (this.footerCount) {
       this.footerCount.textContent = '';
     }
 
     if (this.inputElement) {
-      this.inputElement.setAttribute('aria-expanded', 'false');
+      this.inputElement.setAttribute('aria-expanded', String(this.results.length > 0));
     }
   }
 

@@ -38,6 +38,10 @@ export const DEFAULT_TRANSLATIONS: Required<Translations> = {
   groupOther: 'Other',
 
   // Modal-only
+  favoriteResults: 'Favorites',
+  recentResults: 'Recent',
+  addFavorite: 'Add to favorites',
+  removeFavorite: 'Remove from favorites',
   navigateHint: 'Navigate',
   selectHint: 'Select',
   closeHint: 'Close',
