@@ -12,6 +12,16 @@
       "import": "./dist/search-snippet.es.js",
       "require": "./dist/search-snippet.umd.js",
       "default": "./dist/search-snippet.es.js"
+    },
+    "./search": {
+      "types": "./dist/search.d.ts",
+      "import": "./dist/search-snippet.search.es.js",
+      "default": "./dist/search-snippet.search.es.js"
+    },
+    "./chat": {
+      "types": "./dist/chat.d.ts",
+      "import": "./dist/search-snippet.chat.es.js",
+      "default": "./dist/search-snippet.chat.es.js"
     }
   },
   "files": [
@@ -40,7 +50,7 @@
   },
   "homepage": "https://github.com/cloudflare/ai-search-snippet#readme",
   "scripts": {
-    "build": "tsc --noEmit && vite build",
+    "build": "tsc --noEmit && vite build && vite build --config vite.optimized.config.ts",
     "build:cdn": "pnpm run build && node ./scripts/build-cdn.mjs",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
