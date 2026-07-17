@@ -1,0 +1,21 @@
+packages/snippet/package.json
+  s_c19d887e45615b::t_99170561df460a 61
+pnpm-lock.yaml
+  s_c19d887e45615b::t_9be94e69eaa7bd 116-118,130,1187-1192,1510-1513,1947-1950,3181-3184,3242-3253,4248-4253,4759-4762,5199-5211,6500,6528,6658-6659,6715-6716
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "0cf43b4ebbbcbabf500df2231e38865921f25ffb",
+  "prompts": {},
+  "sessions": {
+    "s_c19d887e45615b": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_09103772dffeiH7Ku8NmWtReiw",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Gabriel Massadas <gmassadas@cloudflare.com>"
+    }
+  }
+}
