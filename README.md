@@ -75,6 +75,35 @@ yarn add @cloudflare/ai-search-snippet
 </chat-page-snippet>
 ```
 
+### Scoped Entrypoints
+
+Use a scoped entrypoint when a page only needs search or chat components. Each import registers
+only the components for that surface:
+
+```typescript
+import { SearchBarSnippet, SearchModalSnippet } from "@cloudflare/ai-search-snippet/search";
+import { ChatBubbleSnippet, ChatPageSnippet } from "@cloudflare/ai-search-snippet/chat";
+```
+
+The same optimized entrypoints are available from the CDN:
+
+```html
+<!-- Registers search-bar-snippet and search-modal-snippet -->
+<script
+  type="module"
+  src="https://<hash>.search.ai.cloudflare.com/assets/v<version>/search-snippet.search.es.js"
+></script>
+
+<!-- Registers chat-bubble-snippet and chat-page-snippet -->
+<script
+  type="module"
+  src="https://<hash>.search.ai.cloudflare.com/assets/v<version>/search-snippet.chat.es.js"
+></script>
+```
+
+The existing package root import and `search-snippet.es.js` CDN file remain the self-contained,
+all-components compatibility entrypoint.
+
 ## 📖 API Reference
 
 ### Components
