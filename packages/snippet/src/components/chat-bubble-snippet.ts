@@ -18,8 +18,7 @@ import {
   parseBooleanAttribute,
   parseChatQueryRewriteAttribute,
 } from '../utils/index.ts';
-import type { Message } from './chat-view.ts';
-import { ChatView } from './chat-view.ts';
+import type { ChatView, Message } from './chat-view.ts';
 
 const COMPONENT_NAME = 'chat-bubble-snippet';
 
@@ -27,6 +26,10 @@ export class ChatBubbleSnippet extends HTMLElement {
   private shadow: ShadowRoot;
   private client: AISearchClient | null = null;
   private chatView: ChatView | null = null;
+  private chatViewInitialization: Promise<ChatView | null> | null = null;
+  private pendingMessages: Message[] | null = null;
+  private connectionGeneration = 0;
+  private configurationGeneration = 0;
   private container: HTMLElement | null = null;
   private isExpanded = false;
   private isMinimized = false;
@@ -58,6 +61,7 @@ export class ChatBubbleSnippet extends HTMLElement {
   }
 
   connectedCallback(): void {
+    this.connectionGeneration += 1;
     this.syncTranslationsFromAttribute();
     this.render();
     this.initializeClient();
@@ -65,6 +69,7 @@ export class ChatBubbleSnippet extends HTMLElement {
   }
 
   disconnectedCallback(): void {
+    this.connectionGeneration += 1;
     this.cleanup();
   }
 
@@ -72,7 +77,18 @@ export class ChatBubbleSnippet extends HTMLElement {
     if (oldValue === newValue) return;
 
     if (name === 'api-url') {
+      this.configurationGeneration += 1;
+      this.chatViewInitialization = null;
+      this.client?.cancelAllRequests();
+      if (this.chatView) {
+        this.pendingMessages = this.chatView.getMessages();
+        this.chatView.destroy();
+        this.chatView = null;
+      }
       this.initializeClient();
+      if (this.isConnected && this.isExpanded) {
+        void this.ensureChatView();
+      }
     } else if (name === 'theme') {
       // Theme changes are handled automatically by CSS :host([theme]) selectors
       this.updateTheme(newValue);
@@ -168,7 +184,7 @@ export class ChatBubbleSnippet extends HTMLElement {
       this.chatView.setProps(this.getProps());
     } else if (wasExpanded) {
       // No pre-existing view (e.g. missing api-url); render the fresh one.
-      this.initializeChatView();
+      void this.ensureChatView();
     }
   }
 
@@ -465,7 +481,7 @@ export class ChatBubbleSnippet extends HTMLElement {
     if (this.isExpanded) {
       bubbleButton?.classList.add('hidden');
       chatWindow?.classList.add('expanded');
-      this.initializeChatView();
+      void this.ensureChatView();
     } else {
       bubbleButton?.classList.remove('hidden');
       chatWindow?.classList.remove('expanded');
@@ -493,24 +509,82 @@ export class ChatBubbleSnippet extends HTMLElement {
     }
   }
 
-  private initializeChatView(): void {
-    if (this.chatView) return;
+  private ensureChatView(): Promise<ChatView | null> {
+    if (this.chatView) return Promise.resolve(this.chatView);
+    if (this.chatViewInitialization) return this.chatViewInitialization;
 
-    const chatContent = this.shadow.querySelector('.chat-content') as HTMLElement;
-    if (!chatContent) return;
-
+    const generation = this.connectionGeneration;
+    const configuration = this.configurationGeneration;
     if (!this.client) {
+      const chatContent = this.shadow.querySelector('.chat-content') as HTMLElement | null;
       const t = this.resolvedTranslations;
-      chatContent.innerHTML = `
-        <div style="padding: 16px; color: var(--search-snippet-error-color, #ef4444); font-family: var(--search-snippet-font-family, sans-serif); font-size: var(--search-snippet-font-size-base, 14px);">
-          <strong>${escapeHTML(t.errorPrefix)}</strong> ${escapeHTML(t.missingApiUrlError)}
-        </div>
-      `;
-      return;
+      if (chatContent) {
+        chatContent.innerHTML = `
+          <div style="padding: 16px; color: var(--search-snippet-error-color, #ef4444); font-family: var(--search-snippet-font-family, sans-serif); font-size: var(--search-snippet-font-size-base, 14px);">
+            <strong>${escapeHTML(t.errorPrefix)}</strong> ${escapeHTML(t.missingApiUrlError)}
+          </div>
+        `;
+      }
+      return Promise.resolve(null);
     }
 
-    const props = this.getProps();
-    this.chatView = new ChatView(chatContent, this.client, props);
+    const initialization = import('./chat-view.ts')
+      .then(({ ChatView }) => {
+        if (
+          !this.isConnected ||
+          generation !== this.connectionGeneration ||
+          configuration !== this.configurationGeneration
+        ) {
+          return null;
+        }
+
+        const chatContent = this.shadow.querySelector('.chat-content') as HTMLElement | null;
+        const client = this.client;
+        if (!chatContent || !client) return null;
+
+        const chatView = new ChatView(chatContent, client, this.getProps());
+        if (
+          !this.isConnected ||
+          generation !== this.connectionGeneration ||
+          configuration !== this.configurationGeneration
+        ) {
+          chatView.destroy();
+          return null;
+        }
+
+        this.chatView = chatView;
+        if (this.pendingMessages) {
+          chatView.setMessages(this.pendingMessages);
+          this.pendingMessages = null;
+        }
+        return chatView;
+      })
+      .catch((error: unknown) => {
+        if (
+          this.isConnected &&
+          generation === this.connectionGeneration &&
+          configuration === this.configurationGeneration
+        ) {
+          console.error('ChatBubbleSnippet:', error);
+          this.dispatchEvent(
+            createCustomEvent('error', {
+              error: {
+                message: (error as Error).message,
+                code: 'CHAT_ERROR',
+              },
+            })
+          );
+        }
+        return null;
+      })
+      .finally(() => {
+        if (this.chatViewInitialization === initialization) {
+          this.chatViewInitialization = null;
+        }
+      });
+
+    this.chatViewInitialization = initialization;
+    return initialization;
   }
 
   private updateTheme(theme: string | null): void {
@@ -532,11 +606,17 @@ export class ChatBubbleSnippet extends HTMLElement {
 
     if (this.client) {
       this.client.cancelAllRequests();
+      this.client = null;
     }
 
     if (this.chatView) {
       this.chatView.destroy();
+      this.chatView = null;
     }
+    this.chatViewInitialization = null;
+    this.pendingMessages = null;
+    this.isExpanded = false;
+    this.isMinimized = false;
   }
 
   // Public API
@@ -545,9 +625,8 @@ export class ChatBubbleSnippet extends HTMLElement {
   }
 
   public async sendMessage(content: string): Promise<void> {
-    if (this.chatView) {
-      await this.chatView.sendMessage(content);
-    }
+    const chatView = await this.ensureChatView();
+    await chatView?.sendMessage(content);
   }
 
   public getMessages(): Message[] {

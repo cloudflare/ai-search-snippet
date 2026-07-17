@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { execFile } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { cp, readdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { cp, readdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
 import { basename } from 'node:path';
 import { promisify } from 'node:util';
 import { brotliCompressSync, gzipSync } from 'node:zlib';
@@ -10,8 +10,8 @@ import { minify } from 'terser';
 const LEGACY_BUNDLE_NAME = 'search-snippet.es.js';
 const MANIFEST_NAME = 'manifest.json';
 const MAX_LEGACY_BROTLI_BYTES = 24 * 1024;
-const MAX_SEARCH_BROTLI_BYTES = 17_920;
-const MAX_CHAT_BROTLI_BYTES = 16_256;
+const MAX_SEARCH_BROTLI_BYTES = 14_400;
+const MAX_CHAT_BROTLI_BYTES = 13_950;
 const distDirectory = new URL('../dist/', import.meta.url);
 const cdnDirectory = new URL('../dist-cdn/', import.meta.url);
 const execFileAsync = promisify(execFile);
@@ -99,9 +99,8 @@ async function minifyModule({ relativePath, url }) {
     fileName,
     `${relativePath} source map points to the wrong file`
   );
-  assert.ok(parsedSourceMap.sources.length > 0, `${relativePath} source map has no sources`);
   assert.equal(
-    parsedSourceMap.sourcesContent.length,
+    (parsedSourceMap.sourcesContent ?? []).length,
     parsedSourceMap.sources.length,
     `${relativePath} source map is missing source content`
   );
@@ -111,7 +110,7 @@ async function minifyModule({ relativePath, url }) {
     writeFile(new URL(`${relativePath}.map`, cdnDirectory), result.map),
   ]);
 
-  return { relativePath, source, code: result.code };
+  return { relativePath, source, code: result.code, sourceMap: parsedSourceMap };
 }
 
 function manifestChunk(manifest, key) {
@@ -149,18 +148,28 @@ function collectStaticManifestKeys(manifest, entryKey, keys = new Set()) {
   return keys;
 }
 
-function collectDynamicFiles(manifest, staticKeys) {
-  const files = new Set();
-  for (const key of staticKeys) {
-    for (const dependency of manifestChunk(manifest, key).dynamicImports ?? []) {
-      files.add(manifestChunk(manifest, dependency).file);
+function collectDeferredManifestKeys(manifest, staticKeys) {
+  const deferredKeys = new Set();
+
+  function visit(key) {
+    if (staticKeys.has(key) || deferredKeys.has(key)) return;
+    deferredKeys.add(key);
+    const chunk = manifestChunk(manifest, key);
+    for (const dependency of [...(chunk.imports ?? []), ...(chunk.dynamicImports ?? [])]) {
+      visit(dependency);
     }
   }
-  return [...files].sort();
+
+  for (const key of staticKeys) {
+    for (const dependency of manifestChunk(manifest, key).dynamicImports ?? []) {
+      visit(dependency);
+    }
+  }
+  return deferredKeys;
 }
 
-async function graphSizes(manifest, staticKeys) {
-  const files = [...staticKeys].map((key) => manifestChunk(manifest, key).file).sort();
+async function graphSizes(manifest, keys) {
+  const files = [...keys].map((key) => manifestChunk(manifest, key).file).sort();
   const totals = { raw: 0, gzip: 0, brotli: 0 };
   for (const file of files) {
     addSizes(totals, sizes(await readFile(new URL(file, cdnDirectory))));
@@ -168,7 +177,46 @@ async function graphSizes(manifest, staticKeys) {
   return { files, totals };
 }
 
-async function validateEntry(name, relativePath, expectedExports, expectedElements) {
+function normalizeSourcePath(source) {
+  return source.replaceAll('\\', '/').replace(/^(\.\.\/)+/, '');
+}
+
+function graphSources(manifest, keys, sourceMaps) {
+  const sources = new Set();
+  for (const key of keys) {
+    const file = manifestChunk(manifest, key).file;
+    const sourceMap = sourceMaps.get(file);
+    assert.ok(sourceMap, `CDN output is missing a parsed source map for ${file}`);
+    for (const source of sourceMap.sources) {
+      sources.add(normalizeSourcePath(source));
+    }
+  }
+  return sources;
+}
+
+function assertLazyBoundary({
+  name,
+  source,
+  dynamicKey,
+  initialKeys,
+  deferredKeys,
+  initialSources,
+  deferredSources,
+}) {
+  assert.ok(manifestChunk(manifest, dynamicKey).isDynamicEntry, `${name} is not a dynamic entry`);
+  assert.ok(!initialKeys.has(dynamicKey), `${name} is present in the initial manifest graph`);
+  assert.ok(deferredKeys.has(dynamicKey), `${name} is not reachable through a dynamic import`);
+  assert.ok(!initialSources.has(source), `${source} is present in the initial output`);
+  assert.ok(deferredSources.has(source), `${source} is missing from the deferred output`);
+}
+
+async function validateEntry(
+  name,
+  relativePath,
+  expectedExports,
+  expectedElements,
+  blockedArtifacts = []
+) {
   const entryUrl = new URL(relativePath, cdnDirectory);
   const validationScript = `
     import assert from 'node:assert/strict';
@@ -187,6 +235,7 @@ async function validateEntry(name, relativePath, expectedExports, expectedElemen
       },
     };
     const entryExports = await import(entryUrl + '?validation=' + Date.now());
+    await new Promise((resolve) => setTimeout(resolve, 0));
     assert.deepEqual(
       Object.keys(entryExports).sort(),
       expectedExports.sort(),
@@ -198,6 +247,11 @@ async function validateEntry(name, relativePath, expectedExports, expectedElemen
       name + ' custom element registrations do not match',
     );
   `;
+  const blocked = blockedArtifacts.map((relativePath) => ({
+    original: new URL(relativePath, cdnDirectory),
+    temporary: new URL(`${relativePath}.blocked`, cdnDirectory),
+  }));
+  await Promise.all(blocked.map(({ original, temporary }) => rename(original, temporary)));
   try {
     await execFileAsync(
       process.execPath,
@@ -215,6 +269,8 @@ async function validateEntry(name, relativePath, expectedExports, expectedElemen
   } catch (error) {
     const details = error.stderr || error.message;
     assert.fail(`${name} validation failed:\n${details}`);
+  } finally {
+    await Promise.all(blocked.map(({ original, temporary }) => rename(temporary, original)));
   }
 }
 
@@ -250,6 +306,9 @@ for (const { relativePath } of modules) {
   );
 }
 const minifiedModules = await Promise.all(modules.map(minifyModule));
+const sourceMaps = new Map(
+  minifiedModules.map(({ relativePath, sourceMap }) => [relativePath, sourceMap])
+);
 const legacyModule = minifiedModules.find(
   ({ relativePath }) => relativePath === LEGACY_BUNDLE_NAME
 );
@@ -257,6 +316,17 @@ assert.ok(legacyModule, `CDN output is missing ${LEGACY_BUNDLE_NAME}`);
 assert.ok(
   legacyModule.code.includes(JSON.stringify(packageJson.version)),
   `CDN bundle does not contain package version ${packageJson.version}`
+);
+assert.deepEqual(
+  relativeImportSpecifiers(legacyModule.code),
+  [],
+  'Legacy ESM bundle has an unresolved chunk dependency'
+);
+const legacyUmd = await readFile(new URL('search-snippet.umd.js', cdnDirectory), 'utf8');
+assert.deepEqual(
+  relativeImportSpecifiers(legacyUmd),
+  [],
+  'Legacy UMD bundle has an unresolved chunk dependency'
 );
 
 const allElements = [
@@ -285,21 +355,58 @@ await validateEntry(
   'search',
   'search-snippet.search.es.js',
   ['SearchBarSnippet', 'SearchModalSnippet'],
-  ['search-bar-snippet', 'search-modal-snippet']
+  ['search-bar-snippet', 'search-modal-snippet'],
+  [manifestChunk(manifest, 'src/components/search-modal-implementation.ts').file]
 );
 await validateEntry(
   'chat',
   'search-snippet.chat.es.js',
   ['ChatBubbleSnippet', 'ChatPageSnippet'],
-  ['chat-bubble-snippet', 'chat-page-snippet']
+  ['chat-bubble-snippet', 'chat-page-snippet'],
+  [manifestChunk(manifest, 'src/components/chat-view.ts').file]
 );
 
 const searchKeys = collectStaticManifestKeys(manifest, 'src/entries/search.ts');
 const chatKeys = collectStaticManifestKeys(manifest, 'src/entries/chat.ts');
-const [searchGraph, chatGraph] = await Promise.all([
+const searchDeferredKeys = collectDeferredManifestKeys(manifest, searchKeys);
+const chatDeferredKeys = collectDeferredManifestKeys(manifest, chatKeys);
+const [searchGraph, searchDeferredGraph, chatGraph, chatDeferredGraph] = await Promise.all([
   graphSizes(manifest, searchKeys),
+  graphSizes(manifest, searchDeferredKeys),
   graphSizes(manifest, chatKeys),
+  graphSizes(manifest, chatDeferredKeys),
 ]);
+const searchSources = graphSources(manifest, searchKeys, sourceMaps);
+const searchDeferredSources = graphSources(manifest, searchDeferredKeys, sourceMaps);
+const chatSources = graphSources(manifest, chatKeys, sourceMaps);
+const chatDeferredSources = graphSources(manifest, chatDeferredKeys, sourceMaps);
+
+assertLazyBoundary({
+  name: 'Search modal implementation',
+  source: 'src/components/search-modal-implementation.ts',
+  dynamicKey: 'src/components/search-modal-implementation.ts',
+  initialKeys: searchKeys,
+  deferredKeys: searchDeferredKeys,
+  initialSources: searchSources,
+  deferredSources: searchDeferredSources,
+});
+assertLazyBoundary({
+  name: 'ChatView',
+  source: 'src/components/chat-view.ts',
+  dynamicKey: 'src/components/chat-view.ts',
+  initialKeys: chatKeys,
+  deferredKeys: chatDeferredKeys,
+  initialSources: chatSources,
+  deferredSources: chatDeferredSources,
+});
+assert.ok(
+  !chatSources.has('src/utils/markdown.ts'),
+  'Markdown rendering is present in the chat initial output'
+);
+assert.ok(
+  chatDeferredSources.has('src/utils/markdown.ts'),
+  'Markdown rendering is missing from the chat deferred output'
+);
 const legacySourceSizes = sizes(legacyModule.source);
 const legacyCdnSizes = sizes(legacyModule.code);
 
@@ -351,15 +458,17 @@ console.table({
   legacySource: legacySourceSizes,
   legacyRoot: legacyCdnSizes,
   searchInitial: searchGraph.totals,
+  searchDeferred: searchDeferredGraph.totals,
   chatInitial: chatGraph.totals,
+  chatDeferred: chatDeferredGraph.totals,
 });
 console.table({
   search: {
     initial: searchGraph.files.join(', '),
-    dynamic: collectDynamicFiles(manifest, searchKeys).join(', ') || '(none)',
+    deferred: searchDeferredGraph.files.join(', ') || '(none)',
   },
   chat: {
     initial: chatGraph.files.join(', '),
-    dynamic: collectDynamicFiles(manifest, chatKeys).join(', ') || '(none)',
+    deferred: chatDeferredGraph.files.join(', ') || '(none)',
   },
 });

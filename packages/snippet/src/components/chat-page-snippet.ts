@@ -17,8 +17,7 @@ import {
   parseBooleanAttribute,
   parseChatQueryRewriteAttribute,
 } from '../utils/index.ts';
-import type { Message } from './chat-view.ts';
-import { ChatView } from './chat-view.ts';
+import type { ChatView, Message } from './chat-view.ts';
 
 const COMPONENT_NAME = 'chat-page-snippet';
 const STORAGE_KEY = 'chat-page-sessions';
@@ -43,6 +42,10 @@ export class ChatPageSnippet extends HTMLElement {
   private shadow: ShadowRoot;
   private client: AISearchClient | null = null;
   private chatView: ChatView | null = null;
+  private chatViewInitialization: Promise<ChatView | null> | null = null;
+  private connectionGeneration = 0;
+  private configurationGeneration = 0;
+  private readyDispatched = false;
   private container: HTMLElement | null = null;
   private sessions: ChatSession[] = [];
   private currentSessionId: string | null = null;
@@ -77,14 +80,16 @@ export class ChatPageSnippet extends HTMLElement {
   }
 
   connectedCallback(): void {
+    this.connectionGeneration += 1;
+    this.readyDispatched = false;
     this.syncTranslationsFromAttribute();
     this.render();
     this.initializeClient();
-    this.setupView();
-    this.dispatchEvent(createCustomEvent('ready', undefined));
+    this.setupViewForReady();
   }
 
   disconnectedCallback(): void {
+    this.connectionGeneration += 1;
     this.saveCurrentSession();
     this.cleanup();
   }
@@ -93,8 +98,19 @@ export class ChatPageSnippet extends HTMLElement {
     if (oldValue === newValue) return;
 
     if (name === 'api-url') {
+      this.configurationGeneration += 1;
+      this.chatViewInitialization = null;
+      const chatContent = this.shadow.querySelector('.container');
+      if (chatContent && this.handleMessageEvent) {
+        chatContent.removeEventListener('message', this.handleMessageEvent);
+        this.handleMessageEvent = null;
+      }
+      this.chatView?.destroy();
+      this.chatView = null;
       this.initializeClient();
-      this.setupView();
+      if (this.isConnected) {
+        this.setupViewForReady();
+      }
     } else if (name === 'theme') {
       // Theme changes are handled automatically by CSS :host([theme]) selectors
       this.updateTheme(newValue);
@@ -644,10 +660,14 @@ export class ChatPageSnippet extends HTMLElement {
     this.handleMessageEvent = null;
   }
 
-  private setupView(): void {
-    const chatContent = this.shadow.querySelector('.container') as HTMLElement;
+  private setupView(): Promise<ChatView | null> {
+    if (this.chatView) return Promise.resolve(this.chatView);
+    if (this.chatViewInitialization) return this.chatViewInitialization;
 
+    const generation = this.connectionGeneration;
+    const configuration = this.configurationGeneration;
     if (!this.client) {
+      const chatContent = this.shadow.querySelector('.container') as HTMLElement | null;
       if (chatContent) {
         const t = this.resolvedTranslations;
         chatContent.innerHTML = `
@@ -656,32 +676,95 @@ export class ChatPageSnippet extends HTMLElement {
           </div>
         `;
       }
-      return;
+      return Promise.resolve(null);
     }
 
-    if (!chatContent) return;
+    const initialization = import('./chat-view.ts')
+      .then(({ ChatView }) => {
+        if (
+          !this.isConnected ||
+          generation !== this.connectionGeneration ||
+          configuration !== this.configurationGeneration
+        ) {
+          return null;
+        }
 
-    const props = this.getProps();
-    this.chatView = new ChatView(chatContent, this.client, props);
+        const chatContent = this.shadow.querySelector('.container') as HTMLElement | null;
+        const client = this.client;
+        if (!chatContent || !client) return null;
 
-    // Load current session or create new one
-    if (this.sessions.length === 0) {
-      this.createNewChat();
-    } else {
-      // Load the most recent session
-      const lastSession = this.sessions[0];
-      this.switchToSession(lastSession.id);
+        const chatView = new ChatView(chatContent, client, this.getProps());
+        if (
+          !this.isConnected ||
+          generation !== this.connectionGeneration ||
+          configuration !== this.configurationGeneration
+        ) {
+          chatView.destroy();
+          return null;
+        }
+        this.chatView = chatView;
+
+        if (this.sessions.length === 0) {
+          this.createNewChat();
+        } else {
+          const session =
+            this.sessions.find(({ id }) => id === this.currentSessionId) ?? this.sessions[0];
+          this.currentSessionId = session.id;
+          chatView.setMessages(session.messages);
+        }
+
+        this.handleMessageEvent = () => {
+          this.saveCurrentSession();
+          this.updateSessionTitle();
+          this.renderChatList();
+        };
+        chatContent.addEventListener('message', this.handleMessageEvent);
+        this.renderChatList();
+        this.dispatchReadyIfUsable(chatView);
+        return chatView;
+      })
+      .catch((error: unknown) => {
+        if (
+          this.isConnected &&
+          generation === this.connectionGeneration &&
+          configuration === this.configurationGeneration
+        ) {
+          console.error('ChatPageSnippet:', error);
+          this.dispatchEvent(
+            createCustomEvent('error', {
+              error: {
+                message: (error as Error).message,
+                code: 'CHAT_ERROR',
+              },
+            })
+          );
+        }
+        return null;
+      })
+      .finally(() => {
+        if (this.chatViewInitialization === initialization) {
+          this.chatViewInitialization = null;
+        }
+      });
+
+    this.chatViewInitialization = initialization;
+    return initialization;
+  }
+
+  private setupViewForReady(): void {
+    const generation = this.connectionGeneration;
+    void this.setupView().then((chatView) => {
+      if (generation === this.connectionGeneration) {
+        this.dispatchReadyIfUsable(chatView);
+      }
+    });
+  }
+
+  private dispatchReadyIfUsable(chatView: ChatView | null): void {
+    if (!this.readyDispatched && this.isConnected && (chatView || !this.client)) {
+      this.readyDispatched = true;
+      this.dispatchEvent(createCustomEvent('ready', undefined));
     }
-
-    // Listen for new messages to save session
-    this.handleMessageEvent = () => {
-      this.saveCurrentSession();
-      this.updateSessionTitle();
-      this.renderChatList();
-    };
-    chatContent.addEventListener('message', this.handleMessageEvent);
-
-    this.renderChatList();
   }
 
   private generateSessionId(): string {
@@ -919,11 +1002,15 @@ export class ChatPageSnippet extends HTMLElement {
 
     if (this.client) {
       this.client.cancelAllRequests();
+      this.client = null;
     }
 
     if (this.chatView) {
       this.chatView.destroy();
+      this.chatView = null;
     }
+    this.chatViewInitialization = null;
+    this.readyDispatched = false;
   }
 
   // Public API
@@ -932,8 +1019,9 @@ export class ChatPageSnippet extends HTMLElement {
   }
 
   public async sendMessage(content: string): Promise<void> {
-    if (this.chatView) {
-      await this.chatView.sendMessage(content);
+    const chatView = await this.setupView();
+    if (chatView) {
+      await chatView.sendMessage(content);
       this.saveCurrentSession();
     }
   }

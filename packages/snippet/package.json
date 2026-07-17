@@ -58,6 +58,7 @@
   },
   "private": false,
   "devDependencies": {
+    "happy-dom": "^20.10.6",
     "terser": "^5.49.0",
     "vite": "^7.3.0",
     "vite-plugin-dts": "^4.5.4",
