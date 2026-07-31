@@ -78,8 +78,30 @@ export const searchStyles = `
 
 .search-submit-button {
   flex-shrink: 0;
-  
+  position: relative;
   border-radius: max(var(--search-snippet-button-min-border-radius, 4px), calc(var(--search-snippet-border-radius) - var(--search-snippet-spacing-sm)))
+}
+
+.search-loading-indicator {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  visibility: hidden;
+}
+
+.search-loading-indicator .loading {
+  width: 16px;
+  height: 16px;
+}
+
+.search-submit-button.is-loading .search-submit-label {
+  visibility: hidden;
+}
+
+.search-submit-button.is-loading .search-loading-indicator {
+  visibility: visible;
 }
 
 /* Search content */

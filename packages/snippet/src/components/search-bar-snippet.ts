@@ -44,7 +44,7 @@ export class SearchBarSnippet extends HTMLElement {
   private inputElement: HTMLInputElement | null = null;
   private resultsContainer: HTMLElement | null = null;
   private searchButton: HTMLButtonElement | null = null;
-  private debouncedSearch: ((query: string) => void) | null = null;
+  private debouncedSearch: (((query: string) => void) & { cancel: () => void }) | null = null;
   private currentSearchController: AbortController | null = null;
   private loadingMessageInterval: ReturnType<typeof setInterval> | null = null;
   private loadingMessageIndex = 0;
@@ -252,7 +252,7 @@ export class SearchBarSnippet extends HTMLElement {
     this.debouncedSearch = debounce(
       searchFn as (...args: unknown[]) => unknown,
       props.debounceMs || 400
-    ) as (query: string) => void;
+    ) as ((query: string) => void) & { cancel: () => void };
 
     const style = document.createElement('style');
     style.textContent = `${baseStyles}\n${searchStyles}`;
@@ -272,7 +272,10 @@ export class SearchBarSnippet extends HTMLElement {
                         autocomplete="off"
                     />
                     <button class="button search-submit-button" aria-label="${escapeHTML(t.searchButtonLabel)}">
-                        <span>${escapeHTML(t.searchButtonLabel)}</span>
+                        <span class="search-submit-label">${escapeHTML(t.searchButtonLabel)}</span>
+                        <span class="search-loading-indicator" aria-hidden="true">
+                            <span class="loading"></span>
+                        </span>
                     </button>
                 </div>
                 <div class="search-content">
@@ -311,6 +314,8 @@ export class SearchBarSnippet extends HTMLElement {
       if (query.length > 0 && this.debouncedSearch) {
         this.debouncedSearch(query);
       } else {
+        this.debouncedSearch?.cancel();
+        this.currentSearchController?.abort();
         this.showEmptyState();
       }
     };
@@ -359,29 +364,38 @@ export class SearchBarSnippet extends HTMLElement {
     }
 
     // Create new controller for this request
-    this.currentSearchController = new AbortController();
+    const controller = new AbortController();
+    this.currentSearchController = controller;
     this.showLoadingState();
 
     try {
       const props = this.getProps();
       const results = await this.client.search(query, {
-        signal: this.currentSearchController.signal,
+        signal: controller.signal,
         maxResults: props.maxResults || DEFAULT_REQUEST_MAX_RESULTS,
         request: this.getRequestOptions(),
       });
+      if (controller.signal.aborted || this.currentSearchController !== controller) return;
+
       const visibleResults = results.slice(0, props.maxRenderResults || DEFAULT_RENDER_RESULTS);
       this.lastSearchQuery = query;
       this.lastSearchTotal = results.length;
       this.stats?.trackSearch(query, results.length);
       this.displayResults(visibleResults, query, results.length);
     } catch (error) {
-      // Don't show error state for cancelled requests
-      if ((error as Error).name === 'AbortError') {
+      // Don't let cancelled or superseded requests update the current UI.
+      if (
+        (error as Error).name === 'AbortError' ||
+        controller.signal.aborted ||
+        this.currentSearchController !== controller
+      ) {
         return;
       }
       this.showErrorState((error as Error).message);
     } finally {
-      this.currentSearchController = null;
+      if (this.currentSearchController === controller) {
+        this.currentSearchController = null;
+      }
     }
   }
 
@@ -391,6 +405,7 @@ export class SearchBarSnippet extends HTMLElement {
     totalResults = results.length
   ): void {
     this.clearLoadingInterval();
+    this.setLoadingIndicator(false);
     if (!this.resultsContainer) return;
 
     if (results.length === 0) {
@@ -581,18 +596,27 @@ export class SearchBarSnippet extends HTMLElement {
     if (!this.resultsContainer) return;
 
     this.clearLoadingInterval();
+    this.setLoadingIndicator(true);
+    if (this.resultsContainer.querySelector('.search-result-item')) {
+      return;
+    }
+
     const messages = this.resolvedTranslations.loadingMessages;
     this.loadingMessageIndex = Math.floor(Math.random() * messages.length);
-    const t = this.resolvedTranslations;
 
     this.resultsContainer.innerHTML = `
             <div class="search-loading">
-                <div class="loading" aria-label="${escapeHTML(t.loadingAriaLabel)}"></div>
                 <div class="loading-text loading-text-animate">${escapeHTML(messages[this.loadingMessageIndex])}</div>
             </div>
         `;
 
     this.startLoadingInterval();
+  }
+
+  private setLoadingIndicator(isLoading: boolean): void {
+    this.searchButton?.classList.toggle('is-loading', isLoading);
+    this.searchButton?.setAttribute('aria-busy', String(isLoading));
+    this.resultsContainer?.setAttribute('aria-busy', String(isLoading));
   }
 
   private startLoadingInterval(): void {
@@ -618,6 +642,7 @@ export class SearchBarSnippet extends HTMLElement {
 
   private showEmptyState(): void {
     this.clearLoadingInterval();
+    this.setLoadingIndicator(false);
     if (!this.resultsContainer) return;
     const t = this.resolvedTranslations;
 
@@ -637,6 +662,7 @@ export class SearchBarSnippet extends HTMLElement {
 
   private showNoResultsState(query: string): void {
     this.clearLoadingInterval();
+    this.setLoadingIndicator(false);
     if (!this.resultsContainer) return;
     const t = this.resolvedTranslations;
 
@@ -656,6 +682,7 @@ export class SearchBarSnippet extends HTMLElement {
 
   private showErrorState(message: string): void {
     this.clearLoadingInterval();
+    this.setLoadingIndicator(false);
     if (!this.resultsContainer) return;
     const t = this.resolvedTranslations;
 

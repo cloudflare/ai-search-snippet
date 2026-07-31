@@ -328,6 +328,9 @@ export class SearchModalSnippet extends HTMLElement {
             autocomplete="off"
             spellcheck="false"
           />
+          <span class="modal-loading-indicator" role="status" aria-label="${escapeHTML(t.loadingAriaLabel)}">
+            <span class="loading" aria-hidden="true"></span>
+          </span>
         </div>
         <div class="modal-content">
           <div class="modal-results" id="modal-results-list" role="listbox" aria-label="${escapeHTML(t.searchResultsAriaLabel)}"></div>
@@ -484,6 +487,8 @@ export class SearchModalSnippet extends HTMLElement {
   }
 
   private selectActiveResult(): void {
+    if (this.currentSearchController) return;
+
     if (this.activeIndex < 0 || this.activeIndex >= this.results.length) {
       // If no result selected but there's a query, perform immediate search
       const query = this.inputElement?.value.trim();
@@ -529,29 +534,38 @@ export class SearchModalSnippet extends HTMLElement {
     }
 
     // Create new controller for this request
-    this.currentSearchController = new AbortController();
+    const controller = new AbortController();
+    this.currentSearchController = controller;
     this.showLoadingState();
 
     try {
       const props = this.getProps();
       const results = await this.client.search(query, {
-        signal: this.currentSearchController.signal,
+        signal: controller.signal,
         maxResults: props.maxResults || DEFAULT_REQUEST_MAX_RESULTS,
         request: this.getRequestOptions(),
       });
+      if (controller.signal.aborted || this.currentSearchController !== controller) return;
+
       const visibleResults = results.slice(0, props.maxRenderResults || DEFAULT_RENDER_RESULTS);
       this.lastSearchQuery = query;
       this.lastSearchTotal = results.length;
       this.stats?.trackSearch(query, results.length);
       this.displayResults(visibleResults, query, results.length);
     } catch (error) {
-      // Don't show error state for cancelled requests
-      if ((error as Error).name === 'AbortError') {
+      // Don't let cancelled or superseded requests update the current UI.
+      if (
+        (error as Error).name === 'AbortError' ||
+        controller.signal.aborted ||
+        this.currentSearchController !== controller
+      ) {
         return;
       }
       this.showErrorState((error as Error).message);
     } finally {
-      this.currentSearchController = null;
+      if (this.currentSearchController === controller) {
+        this.currentSearchController = null;
+      }
     }
   }
 
@@ -570,6 +584,7 @@ export class SearchModalSnippet extends HTMLElement {
     this.activeIndex = this.results.length > 0 ? 0 : -1;
 
     this.clearLoadingInterval();
+    this.setLoadingIndicator(false);
     if (!this.resultsContainer) return;
 
     if (this.results.length === 0) {
@@ -851,6 +866,7 @@ export class SearchModalSnippet extends HTMLElement {
 
   private showEmptyState(): void {
     this.clearLoadingInterval();
+    this.setLoadingIndicator(false);
     if (!this.resultsContainer) return;
 
     this.favoriteResults = loadStoredResults(FAVORITE_RESULTS_STORAGE_KEY);
@@ -891,22 +907,29 @@ export class SearchModalSnippet extends HTMLElement {
     if (!this.resultsContainer) return;
 
     this.clearLoadingInterval();
+    this.setLoadingIndicator(true);
     const messages = this.resolvedTranslations.loadingMessages;
-    const t = this.resolvedTranslations;
     this.loadingMessageIndex = Math.floor(Math.random() * messages.length);
 
-    this.resultsContainer.innerHTML = `
-      <div class="modal-loading">
-        <div class="loading" aria-label="${escapeHTML(t.loadingAriaLabel)}"></div>
-        <div class="loading-text loading-text-animate">${escapeHTML(messages[this.loadingMessageIndex])}</div>
-      </div>
-    `;
+    if (!this.resultsContainer.querySelector('.modal-result-item')) {
+      this.resultsContainer.innerHTML = `
+        <div class="modal-loading">
+          <div class="loading-text loading-text-animate">${escapeHTML(messages[this.loadingMessageIndex])}</div>
+        </div>
+      `;
+    }
 
     if (this.footerCount) {
       this.footerCount.textContent = messages[this.loadingMessageIndex];
     }
 
     this.startLoadingInterval();
+  }
+
+  private setLoadingIndicator(isLoading: boolean): void {
+    this.modal?.classList.toggle('is-loading', isLoading);
+    this.inputElement?.setAttribute('aria-busy', String(isLoading));
+    this.resultsContainer?.setAttribute('aria-busy', String(isLoading));
   }
 
   private startLoadingInterval(): void {
@@ -935,6 +958,7 @@ export class SearchModalSnippet extends HTMLElement {
 
   private showNoResultsState(query: string): void {
     this.clearLoadingInterval();
+    this.setLoadingIndicator(false);
     if (!this.resultsContainer) return;
     const t = this.resolvedTranslations;
 
@@ -960,6 +984,7 @@ export class SearchModalSnippet extends HTMLElement {
 
   private showErrorState(message: string): void {
     this.clearLoadingInterval();
+    this.setLoadingIndicator(false);
     if (!this.resultsContainer) return;
     const t = this.resolvedTranslations;
 
@@ -1110,6 +1135,9 @@ export class SearchModalSnippet extends HTMLElement {
   public close(): void {
     if (!this.isOpen) return;
 
+    this.debouncedSearch?.cancel();
+    this.currentSearchController?.abort();
+    this.currentSearchController = null;
     this.isOpen = false;
     this.backdrop?.classList.remove('open');
     this.modal?.classList.remove('open');
