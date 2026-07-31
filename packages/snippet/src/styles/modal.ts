@@ -81,6 +81,25 @@ export const modalStyles = `
   color: var(--search-snippet-text-secondary);
 }
 
+.modal-loading-indicator {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--search-snippet-icon-size);
+  height: var(--search-snippet-icon-size);
+  flex-shrink: 0;
+  visibility: hidden;
+}
+
+.modal-loading-indicator .loading {
+  width: 16px;
+  height: 16px;
+}
+
+.modal-container.is-loading .modal-loading-indicator {
+  visibility: visible;
+}
+
 .modal-shortcut-hint {
   display: flex;
   align-items: center;
