@@ -35,7 +35,7 @@ export interface SearchSnippetProps {
   /**
    * Group rendered results by this item metadata field (e.g. "group" or
    * "product"). Groups are ordered by the first result that appears in each,
-   * and results within a group keep their relevance order. 
+   * and results within a group keep their relevance order.
    */
   groupBy?: string;
   /**
@@ -226,6 +226,7 @@ export interface Metadata {
   icon?: string;
   image?: string;
   title: string;
+  url?: string;
 }
 
 export interface ScoringDetails {

@@ -24,6 +24,9 @@
     "onlyBuiltDependencies": [
       "esbuild",
       "workerd"
+    ],
+    "ignoredBuiltDependencies": [
+      "sharp"
     ]
   }
 }
