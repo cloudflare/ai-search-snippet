@@ -29,18 +29,18 @@ yarn add @cloudflare/ai-search-snippet
 
 ### Basic Usage
 
-> **Note:** Replace `<hash>` with your Cloudflare AI Search endpoint hash (you can find it in the Cloudflare Dashboard).
+> **Note:** Replace `<PUBLIC_ENDPOINT_ID>` with your Cloudflare AI Search public endpoint ID (you can find it in the Cloudflare Dashboard).
 
 ```html
 <!-- Import the library -->
 <script
   type="module"
-  src="https:/<hash>/search.ai.cloudflare.com/search-snippet.es.js"
+  src="https://<PUBLIC_ENDPOINT_ID>.search.ai.cloudflare.com/assets/v<version>/search-snippet.es.js"
 ></script>
 
 <!-- Search bar with results -->
 <search-bar-snippet
-  api-url="https:/<hash>/search.ai.cloudflare.com/"
+  api-url="https://<PUBLIC_ENDPOINT_ID>.search.ai.cloudflare.com/"
   placeholder="Search..."
   max-results="50"
   max-render-results="10"
@@ -51,7 +51,7 @@ yarn add @cloudflare/ai-search-snippet
 
 <!-- Modal search (opens with Cmd/Ctrl+K) -->
 <search-modal-snippet
-  api-url="https:/<hash>/search.ai.cloudflare.com/"
+  api-url="https://<PUBLIC_ENDPOINT_ID>.search.ai.cloudflare.com/"
   placeholder="Search documentation..."
   max-results="50"
   max-render-results="10"
@@ -62,14 +62,14 @@ yarn add @cloudflare/ai-search-snippet
 
 <!-- Floating chat bubble -->
 <chat-bubble-snippet
-  api-url="https:/<hash>/search.ai.cloudflare.com/"
+  api-url="https://<PUBLIC_ENDPOINT_ID>.search.ai.cloudflare.com/"
   placeholder="Type a message..."
 >
 </chat-bubble-snippet>
 
 <!-- Full-page chat with history -->
 <chat-page-snippet
-  api-url="https:/<hash>/search.ai.cloudflare.com/"
+  api-url="https://<PUBLIC_ENDPOINT_ID>.search.ai.cloudflare.com/"
   placeholder="Type a message..."
 >
 </chat-page-snippet>
@@ -91,13 +91,13 @@ The same optimized entrypoints are available from the CDN:
 <!-- Registers search-bar-snippet and search-modal-snippet -->
 <script
   type="module"
-  src="https://<hash>.search.ai.cloudflare.com/assets/v<version>/search-snippet.search.es.js"
+  src="https://<PUBLIC_ENDPOINT_ID>.search.ai.cloudflare.com/assets/v<version>/search-snippet.search.es.js"
 ></script>
 
 <!-- Registers chat-bubble-snippet and chat-page-snippet -->
 <script
   type="module"
-  src="https://<hash>.search.ai.cloudflare.com/assets/v<version>/search-snippet.chat.es.js"
+  src="https://<PUBLIC_ENDPOINT_ID>.search.ai.cloudflare.com/assets/v<version>/search-snippet.chat.es.js"
 ></script>
 ```
 
@@ -123,10 +123,11 @@ These attributes are available on all components:
 
 | Attribute       | Type                          | Default                 | Description                    |
 | --------------- | ----------------------------- | ----------------------- | ------------------------------ |
-| `api-url`       | string                        | `http://localhost:3000` | API endpoint URL               |
+| `api-url`       | string                        | Required                | AI Search public endpoint base URL |
 | `placeholder`   | string                        | Component-specific      | Input placeholder text         |
 | `theme`         | `'light' \| 'dark' \| 'auto'` | `'auto'`                | Color scheme                   |
 | `hide-branding` | boolean                       | `false`                 | Hide the "Powered by" branding |
+| `translations`  | JSON string or JS property    | -                       | Override user-facing strings   |
 
 ### Search Components Attributes
 
@@ -140,7 +141,10 @@ Additional attributes for `<search-bar-snippet>` and `<search-modal-snippet>`:
 | `show-url`           | boolean | `false` | Show URL in search results                                                        |
 | `show-date`          | boolean | `false` | Show result dates when a timestamp is available                                   |
 | `group-by`           | string  | -       | Group results by this item metadata field (e.g. `group`). Missing values fall into an "Other" bucket |
-| `request-options`    | JSON string | -   | Extra headers, query params, and body fields for search requests                  |
+| `hide-thumbnails`    | boolean | `false` | Hide result thumbnails                                              |
+| `see-more`           | string  | -       | URL prefix for a "See more" link; the URL-encoded query is appended |
+| `disable-analytics`  | boolean | `false` | Disable search, click, and "See more" analytics requests           |
+| `request-options`    | JSON string | -   | Extra headers, query params, and body fields for search requests     |
 
 ### Modal-Specific Attributes
 
@@ -149,7 +153,7 @@ Additional attributes for `<search-modal-snippet>`:
 | Attribute      | Type    | Default | Description                                |
 | -------------- | ------- | ------- | ------------------------------------------ |
 | `shortcut`     | string  | `'k'`   | Keyboard shortcut key (with Cmd/Ctrl)      |
-| `use-meta-key` | boolean | `true`  | Use meta key (Cmd on Mac, Ctrl on Windows) |
+| `use-meta-key` | boolean | `true`  | When `true`, accept Cmd or Ctrl; when `false`, require Ctrl |
 
 ### Search Request Enrichment
 
@@ -172,14 +176,16 @@ The JSON object supports:
 | `queryParams` | `Record<string, string \| number \| boolean>` | Extra query params appended to the request URL |
 | `body` | `Record<string, unknown>` | Extra JSON fields merged into the request body |
 
-Core request fields still win over conflicts: `messages`, `stream`, `max_num_results`, and the
-default `ai_search_options.retrieval.metadata_only` search behavior.
+Core request fields still win over conflicts. For regular search requests, this includes
+`messages`, `stream`, `ai_search_options.retrieval.max_num_results`, and the default
+`ai_search_options.retrieval.metadata_only` value. Nested custom fields that do not conflict are
+preserved.
 
 ### Chat Query Rewrite
 
 `<chat-bubble-snippet>` and `<chat-page-snippet>` automatically forward the full conversation
 history on every chat request. Starting from the **second** user message in a session, the
-client also enables AI Search's [`query_rewrite`](https://developers.cloudflare.com/api/resources/ai_search/subresources/namespaces/methods/search/)
+client also enables AI Search's [`query_rewrite`](https://developers.cloudflare.com/ai-search/configuration/retrieval/query-rewriting/)
 option so the latest user message is rewritten into a self-contained retrieval query using the
 prior turns. The first message is sent as-is — there is no history to rewrite against yet.
 
@@ -260,7 +266,7 @@ const current = chatPage.getCurrentSession(); // Get current session
 
 ### Events
 
-#### Common Events (all components)
+#### Lifecycle Events
 
 ```javascript
 const component = document.querySelector("search-bar-snippet");
@@ -268,11 +274,10 @@ const component = document.querySelector("search-bar-snippet");
 component.addEventListener("ready", () => {
   console.log("Component ready");
 });
-
-component.addEventListener("error", (e) => {
-  console.error("Error:", e.detail.error);
-});
 ```
+
+`ready` is dispatched by all components. Search components render search errors and results in
+their UI but do not currently dispatch `search` or `error` events.
 
 #### Modal-Specific Events
 
@@ -300,7 +305,14 @@ const chat = document.querySelector("chat-bubble-snippet");
 chat.addEventListener("message", (e) => {
   console.log("New message:", e.detail.message);
 });
+
+chat.addEventListener("error", (e) => {
+  console.error("Error:", e.detail.error);
+});
 ```
+
+Chat `message` events contain a `Message` object in `e.detail.message`. Chat errors contain an
+error object in `e.detail.error`.
 
 ## 🎨 Customization
 
@@ -637,60 +649,162 @@ The workflow validates the version, creates a git tag, and publishes a GitHub Re
 
 ## 📝 API Server Requirements
 
-The component expects the API server to implement the following endpoints:
+`api-url` must point to the base URL of an AI Search public endpoint. The client removes a
+trailing slash and appends the operation path, so a URL such as
+`https://<PUBLIC_ENDPOINT_ID>.search.ai.cloudflare.com/` is expected.
+
+The search components use `/search`, and the chat components use `/chat/completions`.
 
 ### Search Endpoint
 
 **POST** `/search`
 
-Request:
+The client sends an OpenAI-compatible `messages` array. A regular search request has this shape
+(the component default for `max-results` is `50`; `AISearchClient.search()` defaults to `30` when
+called directly):
 
 ```json
 {
-  "query": "search query",
-  "max_num_results": 10,
-  "filters": {}
-}
-```
-
-Response:
-
-```json
-{
-  "results": [
-    {
-      "id": "result-1",
-      "title": "Result Title",
-      "snippet": "Result description...",
-      "url": "https://example.com",
-      "metadata": {}
-    }
-  ],
-  "total": 42
-}
-```
-
-### Chat Endpoint (Streaming)
-
-**POST** `/ask`
-
-Request:
-
-```json
-{
-  "query": "user message",
-  "generate_mode": "summarize",
-  "prev": [
+  "messages": [
     {
       "role": "user",
-      "content": "previous message",
-      "timestamp": 1234567890
+      "content": "search query"
+    }
+  ],
+  "stream": false,
+  "ai_search_options": {
+    "retrieval": {
+      "metadata_only": true,
+      "max_num_results": 50
+    }
+  }
+}
+```
+
+The response must use the AI Search envelope:
+
+```json
+{
+  "success": true,
+  "result": {
+    "search_query": "search query",
+    "chunks": [
+      {
+        "id": "chunk-1",
+        "type": "text",
+        "text": "Result text",
+        "item": {
+          "key": "https://example.com/docs",
+          "timestamp": 1710000000,
+          "metadata": {
+            "title": "Result Title",
+            "description": "Result description",
+            "image": "https://example.com/image.png"
+          }
+        },
+        "instance_id": "instance-1",
+        "scoring_details": {
+          "vector_score": 0.9
+        }
+      }
+    ]
+  }
+}
+```
+
+The component maps `item.key` to `url`, `metadata.title` to `title`, and
+`metadata.description` to `description`. Additional fields in `metadata` are preserved on the
+returned result.
+
+### Chat Completions Endpoint
+
+**POST** `/chat/completions`
+
+Chat requests use the full conversation in `messages` and stream by default:
+
+```json
+{
+  "messages": [
+    {
+      "role": "user",
+      "content": "user message"
+    },
+    {
+      "role": "assistant",
+      "content": "previous answer"
+    },
+    {
+      "role": "user",
+      "content": "follow-up message"
+    }
+  ],
+  "stream": true,
+  "ai_search_options": {
+    "query_rewrite": {
+      "enabled": true,
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "rewrite_prompt": "..."
+    }
+  }
+}
+```
+
+`ai_search_options.query_rewrite` is included for follow-up messages when query rewriting is
+enabled. It is omitted on the first message and when rewriting is disabled.
+
+Streaming responses use Server-Sent Events (SSE). The client consumes content deltas from frames
+like these, ignores the optional `event: chunks` source frame, and stops at `[DONE]`:
+
+```text
+event: chunks
+data: [{"id":"chunk-1","item":{"key":"https://example.com/docs"}}]
+
+data: {"choices":[{"delta":{"content":"Answer text"}}]}
+
+data: [DONE]
+```
+
+For `stream: false`, the response must be JSON in the OpenAI-compatible shape:
+
+```json
+{
+  "choices": [
+    {
+      "message": {
+        "content": "Complete answer"
+      }
     }
   ]
 }
 ```
 
-Response: Streaming text chunks via ReadableStream
+### Streaming Search Client Method
+
+`AISearchClient.searchStream()` is separate from the search components, which use `/search`.
+The current implementation calls **POST** `/ai-search` with a body containing `messages`,
+`stream: true`, and an optional top-level `max_num_results`. It expects SSE-style frames with a
+`response` field, such as `data: {"response":"Result text"}`, and returns one `SearchResult`
+whose `description` is the concatenated response. The other result fields are empty.
+
+### Analytics Endpoint
+
+Search components send analytics to **POST** `/stats` unless `disable-analytics="true"` is set.
+Events are buffered and sent as:
+
+```json
+{
+  "events": [
+    {
+      "inputQuery": "search query",
+      "snippetVersion": "<version>",
+      "totalResult": 10
+    }
+  ]
+}
+```
+
+Click events additionally include `clickedResultId`, `clickPosition`, and `clickViewMore: false`.
+"See more" events include `clickViewMore: true`.
 
 ## 🧪 Browser Support
 
