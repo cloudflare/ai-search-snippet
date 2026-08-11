@@ -243,7 +243,7 @@ export class AISearchClient {
                 ? decodeHTMLEntities(chunk.item.metadata?.description)
                 : '',
               timestamp: chunk.item.timestamp ?? undefined,
-              url: chunk.item.key,
+              url: chunk.item.metadata?.url || chunk.item.key,
               image: chunk.item.metadata?.image || undefined,
               metadata: {
                 ...(chunk.item.metadata as unknown as Record<string, unknown>),

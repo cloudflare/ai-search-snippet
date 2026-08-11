@@ -30,6 +30,7 @@ function createSearchResponse(): Response {
               metadata: {
                 title: 'Cloudflare Docs',
                 description: 'Everything about Cloudflare.',
+                url: 'https://example.com/canonical-docs',
               },
             },
             scoring_details: {
@@ -525,5 +526,83 @@ describe('AISearchClient.chat', () => {
     }
 
     expect(yields).toEqual([{ type: 'text', message: 'partial' }]);
+  });
+});
+
+describe('AISearchClient.search', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  it('uses metadata URL instead of the item key', async () => {
+    vi.stubGlobal('DOMParser', MockDOMParser);
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(createSearchResponse());
+
+    const client = new AISearchClient('https://example.com');
+    const [result] = await client.search('cloudflare');
+
+    expect(result.url).toBe('https://example.com/canonical-docs');
+  });
+
+  it('falls back to the item key when metadata URL is missing or empty', async () => {
+    vi.stubGlobal('DOMParser', MockDOMParser);
+
+    const response = {
+      success: true,
+      result: {
+        search_query: 'cloudflare',
+        chunks: [
+          {
+            id: 'doc-1',
+            type: 'chunk',
+            text: 'Cloudflare docs',
+            item: {
+              key: 'https://example.com/docs',
+              timestamp: 1710000000,
+              metadata: {
+                title: 'Cloudflare Docs',
+                description: 'Everything about Cloudflare.',
+              },
+            },
+            scoring_details: {
+              vector_score: 0.9,
+            },
+          },
+          {
+            id: 'doc-2',
+            type: 'chunk',
+            text: 'Cloudflare blog',
+            item: {
+              key: 'https://example.com/blog',
+              timestamp: 1710000001,
+              metadata: {
+                title: 'Cloudflare Blog',
+                description: 'Cloudflare news.',
+                url: '',
+              },
+            },
+            scoring_details: {
+              vector_score: 0.8,
+            },
+          },
+        ],
+      },
+    };
+
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify(response), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    );
+
+    const client = new AISearchClient('https://example.com');
+    const results = await client.search('cloudflare');
+
+    expect(results.map((result) => result.url)).toEqual([
+      'https://example.com/docs',
+      'https://example.com/blog',
+    ]);
   });
 });
