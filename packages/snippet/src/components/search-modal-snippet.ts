@@ -59,6 +59,8 @@ export class SearchModalSnippet extends HTMLElement {
   private backdrop: HTMLElement | null = null;
   private modal: HTMLElement | null = null;
   private inputElement: HTMLInputElement | null = null;
+  private closeButton: HTMLButtonElement | null = null;
+  private contentElement: HTMLElement | null = null;
   private resultsContainer: HTMLElement | null = null;
   private footerCount: HTMLElement | null = null;
   private isOpen = false;
@@ -82,6 +84,9 @@ export class SearchModalSnippet extends HTMLElement {
   private handleInputChange: ((e: Event) => void) | null = null;
   private handleInputKeydown: ((e: KeyboardEvent) => void) | null = null;
   private handleBackdropClick: ((e: MouseEvent) => void) | null = null;
+  private handleCloseButtonClick: (() => void) | null = null;
+  private handleContentTouchMove: (() => void) | null = null;
+  private handleViewportResize: (() => void) | null = null;
   private handleResultsContainerClick: ((e: Event) => void) | null = null;
 
   // Scroll lock state
@@ -183,6 +188,8 @@ export class SearchModalSnippet extends HTMLElement {
       this.isOpen = true;
       this.backdrop?.classList.add('open');
       this.modal?.classList.add('open');
+      // Re-apply the tracked viewport height to the freshly rendered container
+      this.handleViewportResize?.();
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
           this.inputElement?.focus();
@@ -318,7 +325,7 @@ export class SearchModalSnippet extends HTMLElement {
             <path d="M784-120 532-372q-30 24-69 38t-83 14q-109 0-184.5-75.5T120-580q0-109 75.5-184.5T380-840q109 0 184.5 75.5T640-580q0 44-14 83t-38 69l252 252-56 56ZM380-400q75 0 127.5-52.5T560-580q0-75-52.5-127.5T380-760q-75 0-127.5 52.5T200-580q0 75 52.5 127.5T380-400Z"/>
           </svg>
           <input
-            type="text"
+            type="search"
             class="modal-search-input"
             placeholder="${escapeHTML(props.placeholder || t.placeholder)}"
             aria-label="${escapeHTML(t.searchButtonLabel)}"
@@ -326,11 +333,19 @@ export class SearchModalSnippet extends HTMLElement {
             aria-controls="modal-results-list"
             aria-expanded="false"
             autocomplete="off"
+            autocapitalize="off"
+            autocorrect="off"
+            enterkeyhint="search"
             spellcheck="false"
           />
           <span class="modal-loading-indicator" role="status" aria-label="${escapeHTML(t.loadingAriaLabel)}">
             <span class="loading" aria-hidden="true"></span>
           </span>
+          <button type="button" class="modal-close-button" aria-label="${escapeHTML(t.closeAriaLabel)}">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M18 6 6 18M6 6l12 12" />
+            </svg>
+          </button>
         </div>
         <div class="modal-content">
           <div class="modal-results" id="modal-results-list" role="listbox" aria-label="${escapeHTML(t.searchResultsAriaLabel)}"></div>
@@ -364,6 +379,8 @@ export class SearchModalSnippet extends HTMLElement {
     this.backdrop = this.shadow.querySelector('.modal-backdrop');
     this.modal = this.shadow.querySelector('.modal-container');
     this.inputElement = this.shadow.querySelector('.modal-search-input');
+    this.closeButton = this.shadow.querySelector('.modal-close-button');
+    this.contentElement = this.shadow.querySelector('.modal-content');
     this.resultsContainer = this.shadow.querySelector('.modal-results');
     this.footerCount = this.shadow.querySelector('.modal-results-count');
 
@@ -444,6 +461,45 @@ export class SearchModalSnippet extends HTMLElement {
       }
     };
     this.backdrop.addEventListener('click', this.handleBackdropClick);
+
+    // Explicit close button (shown on small screens, where there is no Esc key
+    // and the fullscreen modal leaves no backdrop to tap)
+    this.handleCloseButtonClick = () => this.close();
+    this.closeButton?.addEventListener('click', this.handleCloseButtonClick);
+
+    // Dismiss the on-screen keyboard once the user starts scrolling results,
+    // so the full list is visible
+    this.handleContentTouchMove = () => {
+      if (this.shadow.activeElement === this.inputElement) {
+        this.inputElement?.blur();
+      }
+    };
+    this.contentElement?.addEventListener('touchmove', this.handleContentTouchMove, {
+      passive: true,
+    });
+  }
+
+  /**
+   * Track the visual viewport height so the fullscreen mobile modal shrinks
+   * above the on-screen keyboard instead of being covered by it.
+   */
+  private attachViewportListener(): void {
+    const viewport = window.visualViewport;
+    if (!viewport || this.handleViewportResize) return;
+
+    this.handleViewportResize = () => {
+      this.modal?.style.setProperty('--search-snippet-viewport-height', `${viewport.height}px`);
+    };
+    this.handleViewportResize();
+    viewport.addEventListener('resize', this.handleViewportResize);
+  }
+
+  private detachViewportListener(): void {
+    if (this.handleViewportResize) {
+      window.visualViewport?.removeEventListener('resize', this.handleViewportResize);
+      this.handleViewportResize = null;
+    }
+    this.modal?.style.removeProperty('--search-snippet-viewport-height');
   }
 
   private navigateResults(direction: number): void {
@@ -1087,12 +1143,23 @@ export class SearchModalSnippet extends HTMLElement {
       this.backdrop.removeEventListener('click', this.handleBackdropClick);
     }
 
+    if (this.closeButton && this.handleCloseButtonClick) {
+      this.closeButton.removeEventListener('click', this.handleCloseButtonClick);
+    }
+
+    if (this.contentElement && this.handleContentTouchMove) {
+      this.contentElement.removeEventListener('touchmove', this.handleContentTouchMove);
+    }
+
+    this.detachViewportListener();
     this.detachResultsContainerClick();
 
     // Clear handler references
     this.handleInputChange = null;
     this.handleInputKeydown = null;
     this.handleBackdropClick = null;
+    this.handleCloseButtonClick = null;
+    this.handleContentTouchMove = null;
 
     // Flush remaining analytics and remove unload listeners
     this.destroyStatsClient();
@@ -1125,6 +1192,7 @@ export class SearchModalSnippet extends HTMLElement {
 
     // Prevent body scroll (save current styles to restore later)
     this.lockBodyScroll();
+    this.attachViewportListener();
 
     this.dispatchEvent(createCustomEvent('open', undefined));
   }
@@ -1152,6 +1220,7 @@ export class SearchModalSnippet extends HTMLElement {
 
     // Restore body scroll
     this.unlockBodyScroll();
+    this.detachViewportListener();
 
     this.dispatchEvent(createCustomEvent('close', undefined));
   }

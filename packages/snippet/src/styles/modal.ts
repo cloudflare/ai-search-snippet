@@ -81,6 +81,51 @@ export const modalStyles = `
   color: var(--search-snippet-text-secondary);
 }
 
+/* type="search" is used for the mobile keyboard; drop the native UA styling */
+.modal-search-input::-webkit-search-decoration,
+.modal-search-input::-webkit-search-cancel-button {
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+/* Close button: only shown on small screens (see media query below) */
+.modal-close-button {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  margin: calc(var(--search-snippet-spacing-xs) * -1) 0;
+  padding: 8px;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--search-snippet-text-secondary);
+  cursor: pointer;
+  transition: var(--search-snippet-transition-fast);
+}
+
+.modal-close-button:hover,
+.modal-close-button:focus-visible {
+  background: var(--search-snippet-hover-background);
+  color: var(--search-snippet-text-color);
+}
+
+.modal-close-button:focus-visible {
+  outline: 2px solid var(--search-snippet-primary-color);
+  outline-offset: -2px;
+}
+
+.modal-close-button svg {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-width: 2;
+}
+
 .modal-loading-indicator {
   display: flex;
   align-items: center;
@@ -129,6 +174,7 @@ export const modalStyles = `
   flex: 1;
   overflow-y: auto;
   overflow-x: hidden;
+  overscroll-behavior: contain;
   padding: var(--search-snippet-spacing-sm);
 }
 
@@ -563,19 +609,6 @@ a.modal-result-item:focus-visible {
   text-decoration: underline;
 }
 
-/* Responsive adjustments */
-@media (max-width: 640px) {
-  .modal-container {
-    top: 10%;
-    width: 95%;
-    max-height: 80vh;
-  }
-
-  .modal-footer-hints {
-    display: none;
-  }
-}
-
 /* Animation for modal open */
 @keyframes modal-slide-in {
   from {
@@ -590,5 +623,66 @@ a.modal-result-item:focus-visible {
 
 .modal-container.open {
   animation: modal-slide-in var(--search-snippet-transition) ease-out;
+}
+
+@keyframes modal-fullscreen-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/*
+ * Small screens: take over the whole viewport instead of floating a card.
+ * The height follows the visual viewport (set from JS while open) so the
+ * results end above the on-screen keyboard; dvh/vh are fallbacks.
+ */
+@media (max-width: 640px) {
+  .modal-container,
+  .modal-container.open {
+    top: 0;
+    left: 0;
+    width: 100%;
+    max-width: none;
+    height: 100vh;
+    height: var(--search-snippet-viewport-height, 100dvh);
+    max-height: none;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+    transform: none;
+  }
+
+  .modal-container.open {
+    animation: modal-fullscreen-in var(--search-snippet-transition) ease-out;
+  }
+
+  .modal-header {
+    padding-top: calc(var(--search-snippet-spacing-md) + env(safe-area-inset-top, 0px));
+    padding-left: calc(var(--search-snippet-spacing-md) + env(safe-area-inset-left, 0px));
+    padding-right: calc(var(--search-snippet-spacing-md) + env(safe-area-inset-right, 0px));
+  }
+
+  .modal-close-button {
+    display: flex;
+  }
+
+  .modal-footer {
+    border-radius: 0;
+    padding-bottom: calc(var(--search-snippet-spacing-sm) + env(safe-area-inset-bottom, 0px));
+  }
+
+  .modal-footer-hints {
+    display: none;
+  }
+
+  /* With the hints hidden, the footer is empty unless branding is shown */
+  .modal-footer:not(:has(.powered-by-inline)) {
+    display: none;
+  }
 }
 `;
