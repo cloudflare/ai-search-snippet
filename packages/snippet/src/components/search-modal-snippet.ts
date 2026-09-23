@@ -86,7 +86,6 @@ export class SearchModalSnippet extends HTMLElement {
   private handleBackdropClick: ((e: MouseEvent) => void) | null = null;
   private handleCloseButtonClick: (() => void) | null = null;
   private handleContentTouchMove: (() => void) | null = null;
-  private handleViewportResize: (() => void) | null = null;
   private handleResultsContainerClick: ((e: Event) => void) | null = null;
 
   // Scroll lock state
@@ -188,8 +187,6 @@ export class SearchModalSnippet extends HTMLElement {
       this.isOpen = true;
       this.backdrop?.classList.add('open');
       this.modal?.classList.add('open');
-      // Re-apply the tracked viewport height to the freshly rendered container
-      this.handleViewportResize?.();
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
           this.inputElement?.focus();
@@ -477,29 +474,6 @@ export class SearchModalSnippet extends HTMLElement {
     this.contentElement?.addEventListener('touchmove', this.handleContentTouchMove, {
       passive: true,
     });
-  }
-
-  /**
-   * Track the visual viewport height so the fullscreen mobile modal shrinks
-   * above the on-screen keyboard instead of being covered by it.
-   */
-  private attachViewportListener(): void {
-    const viewport = window.visualViewport;
-    if (!viewport || this.handleViewportResize) return;
-
-    this.handleViewportResize = () => {
-      this.modal?.style.setProperty('--search-snippet-viewport-height', `${viewport.height}px`);
-    };
-    this.handleViewportResize();
-    viewport.addEventListener('resize', this.handleViewportResize);
-  }
-
-  private detachViewportListener(): void {
-    if (this.handleViewportResize) {
-      window.visualViewport?.removeEventListener('resize', this.handleViewportResize);
-      this.handleViewportResize = null;
-    }
-    this.modal?.style.removeProperty('--search-snippet-viewport-height');
   }
 
   private navigateResults(direction: number): void {
@@ -1151,7 +1125,6 @@ export class SearchModalSnippet extends HTMLElement {
       this.contentElement.removeEventListener('touchmove', this.handleContentTouchMove);
     }
 
-    this.detachViewportListener();
     this.detachResultsContainerClick();
 
     // Clear handler references
@@ -1192,7 +1165,6 @@ export class SearchModalSnippet extends HTMLElement {
 
     // Prevent body scroll (save current styles to restore later)
     this.lockBodyScroll();
-    this.attachViewportListener();
 
     this.dispatchEvent(createCustomEvent('open', undefined));
   }
@@ -1220,7 +1192,6 @@ export class SearchModalSnippet extends HTMLElement {
 
     // Restore body scroll
     this.unlockBodyScroll();
-    this.detachViewportListener();
 
     this.dispatchEvent(createCustomEvent('close', undefined));
   }

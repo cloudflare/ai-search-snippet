@@ -636,11 +636,7 @@ a.modal-result-item:focus-visible {
   }
 }
 
-/*
- * Small screens: take over the whole viewport instead of floating a card.
- * The height follows the visual viewport (set from JS while open) so the
- * results end above the on-screen keyboard; dvh/vh are fallbacks.
- */
+/* Small screens: take over the whole viewport instead of floating a card */
 @media (max-width: 640px) {
   .modal-container,
   .modal-container.open {
@@ -649,7 +645,7 @@ a.modal-result-item:focus-visible {
     width: 100%;
     max-width: none;
     height: 100vh;
-    height: var(--search-snippet-viewport-height, 100dvh);
+    height: 100dvh;
     max-height: none;
     border: 0;
     border-radius: 0;
