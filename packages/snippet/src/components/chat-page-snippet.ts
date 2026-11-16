@@ -863,12 +863,12 @@ export class ChatPageSnippet extends HTMLElement {
     const deleteTitle = this.resolvedTranslations.deleteChatTitle;
 
     return `
-      <div class="chat-list-item ${isActive ? 'active' : ''}" data-session-id="${session.id}">
+      <div class="chat-list-item ${isActive ? 'active' : ''}" data-session-id="${this.escapeHTML(session.id)}">
         <div class="chat-list-item-content">
           <div class="chat-list-item-title">${this.escapeHTML(session.title)}</div>
           <div class="chat-list-item-date">${date}</div>
         </div>
-        <button class="chat-list-item-delete" data-session-id="${session.id}" title="${this.escapeHTML(deleteTitle)}">
+        <button class="chat-list-item-delete" data-session-id="${this.escapeHTML(session.id)}" title="${this.escapeHTML(deleteTitle)}">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
           </svg>
@@ -895,9 +895,7 @@ export class ChatPageSnippet extends HTMLElement {
   }
 
   private escapeHTML(str: string): string {
-    const div = document.createElement('div');
-    div.textContent = str;
-    return div.innerHTML;
+    return escapeHTMLUtil(str);
   }
 
   private updateTheme(theme: string | null): void {
