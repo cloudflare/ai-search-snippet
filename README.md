@@ -136,7 +136,7 @@ Additional attributes for `<search-bar-snippet>` and `<search-modal-snippet>`:
 | -------------------- | ------- | ------- | --------------------------------------------------------------------------------- |
 | `max-results`        | number  | `50`    | Maximum number of results to request from the API                                 |
 | `max-render-results` | number  | `10`    | Maximum number of results rendered in the UI (drives the "see more" affordance)   |
-| `debounce-ms`        | number  | `300`   | Input debounce delay in milliseconds                                              |
+| `debounce-ms`        | number  | `500`   | Input debounce delay in milliseconds                                              |
 | `show-url`           | boolean | `false` | Show URL in search results                                                        |
 | `show-date`          | boolean | `false` | Show result dates when a timestamp is available                                   |
 | `group-by`           | string  | -       | Group results by this item metadata field (e.g. `group`). Missing values fall into an "Other" bucket |

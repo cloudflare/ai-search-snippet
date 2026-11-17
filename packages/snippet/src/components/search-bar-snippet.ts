@@ -176,7 +176,7 @@ export class SearchBarSnippet extends HTMLElement {
         this.getAttribute('max-render-results'),
         DEFAULT_RENDER_RESULTS
       ),
-      debounceMs: parseNumberAttribute(this.getAttribute('debounce-ms'), 300),
+      debounceMs: parseNumberAttribute(this.getAttribute('debounce-ms'), 500),
       theme: parseAttribute(this.getAttribute('theme'), 'auto') as 'light' | 'dark' | 'auto',
       hideBranding: parseBooleanAttribute(this.getAttribute('hide-branding'), false),
       showUrl: parseBooleanAttribute(this.getAttribute('show-url'), false),
@@ -251,7 +251,7 @@ export class SearchBarSnippet extends HTMLElement {
     const searchFn = (query: string) => this.performSearch(query);
     this.debouncedSearch = debounce(
       searchFn as (...args: unknown[]) => unknown,
-      props.debounceMs || 400
+      props.debounceMs || 500
     ) as ((query: string) => void) & { cancel: () => void };
 
     const style = document.createElement('style');

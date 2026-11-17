@@ -222,7 +222,7 @@ export class SearchModalSnippet extends HTMLElement {
         this.getAttribute('max-render-results'),
         DEFAULT_RENDER_RESULTS
       ),
-      debounceMs: parseNumberAttribute(this.getAttribute('debounce-ms'), 300),
+      debounceMs: parseNumberAttribute(this.getAttribute('debounce-ms'), 500),
       theme: parseAttribute(this.getAttribute('theme'), 'auto') as 'light' | 'dark' | 'auto',
       shortcut: parseAttribute(this.getAttribute('shortcut'), 'k'),
       useMetaKey: this.getAttribute('use-meta-key') !== 'false',
@@ -299,7 +299,7 @@ export class SearchModalSnippet extends HTMLElement {
     const searchFn = (query: string) => this.performSearch(query);
     this.debouncedSearch = debounce(
       searchFn as (...args: unknown[]) => unknown,
-      props.debounceMs || 300
+      props.debounceMs || 500
     );
 
     const style = document.createElement('style');

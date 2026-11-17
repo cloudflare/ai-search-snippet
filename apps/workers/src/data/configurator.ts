@@ -60,7 +60,7 @@ export function createPropConfigs(defaultApiUrl = ''): readonly PropConfig[] {
     {
       name: 'debounce-ms',
       type: 'number',
-      defaultValue: 300,
+      defaultValue: 500,
       description: 'Debounce delay in milliseconds',
       appliesTo: ['search-bar', 'search-modal'],
     },
