@@ -174,12 +174,13 @@ export class ChatBubbleSnippet extends HTMLElement {
 
   private getProps(): SearchSnippetProps {
     const t = this.resolvedTranslations;
+  
     return {
       apiUrl: parseAttribute(this.getAttribute('api-url'), ''),
       placeholder: parseAttribute(this.getAttribute('placeholder'), t.chatPlaceholder),
       theme: parseAttribute(this.getAttribute('theme'), 'auto') as 'light' | 'dark' | 'auto',
       hideBranding: parseBooleanAttribute(this.getAttribute('hide-branding'), false),
-      translations: this.translationsOverride ?? undefined,
+      translations: this.resolvedTranslations,
       chatQueryRewrite: this.resolveChatQueryRewrite(),
     };
   }
