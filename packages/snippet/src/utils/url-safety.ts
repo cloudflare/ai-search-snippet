@@ -34,12 +34,13 @@ const SAFE_ABSOLUTE_SCHEMES = new Set(['http:', 'https:', 'mailto:', 'tel:']);
 export function sanitizeUrl(url: string | undefined | null): string {
   if (typeof url !== 'string') return '';
 
-  // Strip leading + trailing ASCII whitespace and C0 control chars to
-  // match what the HTML spec says the URL parser does before scheme
-  // matching. The control-char ranges are deliberate so the
-  // post-strip scheme check sees the same input the browser would.
+  // Mirror the WHATWG URL parser's pre-processing so the scheme check
+  // sees the same input the browser would: remove ASCII tab / newline
+  // from anywhere in the string (e.g. `java\tscript:`), then strip
+  // leading + trailing ASCII whitespace and C0 control chars.
   // biome-ignore lint/suspicious/noControlCharactersInRegex: deliberate — strips the same C0 chars the URL parser strips before scheme matching.
-  const stripped = url.replace(/^[\s\u0000-\u001f\u007f]+|[\s\u0000-\u001f\u007f]+$/g, '');
+  const edgeWhitespaceRe = /^[\s\u0000-\u001f\u007f]+|[\s\u0000-\u001f\u007f]+$/g;
+  const stripped = url.replace(/[\t\n\r]/g, '').replace(edgeWhitespaceRe, '');
   if (stripped === '') return '';
 
   // Relative URL (path, query, or fragment): always safe because it

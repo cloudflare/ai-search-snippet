@@ -37,18 +37,20 @@ export function debounce<T extends (...args: unknown[]) => unknown>(
  * Sanitize HTML to prevent XSS attacks
  */
 export function sanitizeHTML(html: string): string {
-  const div = document.createElement('div');
-  div.textContent = html;
-  return div.innerHTML;
+  return escapeHTML(html);
 }
 
 /**
- * Escape HTML entities
+ * Escape HTML entities. Safe for both element content and quoted
+ * attribute values (encodes `"` and `'` in addition to `&`, `<`, `>`).
  */
 export function escapeHTML(text: string): string {
-  const div = document.createElement('div');
-  div.textContent = text;
-  return div.innerHTML;
+  return String(text)
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#39;');
 }
 
 /**
